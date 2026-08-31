@@ -5,10 +5,11 @@ suppressPackageStartupMessages({
 })
 
 arguments <- commandArgs(trailingOnly = TRUE)
-if (length(arguments) < 1L) stop("Usage: Rscript scripts/export_hd_12163.R <source-object.RDS> [output-directory]")
+if (length(arguments) < 1L) stop("Usage: Rscript scripts/export_hd_12163.R <source-object.RDS> [output-directory] [hires-image.png]")
 
 source_object <- arguments[[1]]
 output_dir <- if (length(arguments) >= 2L) arguments[[2]] else "public"
+hires_image_path <- if (length(arguments) >= 3L) arguments[[3]] else NA_character_
 output_file <- file.path(output_dir, "data", "hd-12163.json")
 gene_output_dir <- file.path(output_dir, "data", "hd-12163-genes")
 
@@ -27,6 +28,7 @@ metadata <- visium@meta.data
 
 shared_image_filename <- "hd-12163.png"
 shared_image_path <- sprintf("/%s", shared_image_filename)
+hires_image <- if (!is.na(hires_image_path)) readPNG(hires_image_path, native = TRUE) else NULL
 image_paths <- list()
 image_dimensions <- list()
 cell_records <- list()
@@ -36,10 +38,16 @@ for (slice_index in seq_along(Images(visium))) {
   slice_name <- Images(visium)[slice_index]
   spatial_image <- visium[[slice_name]]
   coordinates <- GetTissueCoordinates(spatial_image)
-  image_scale <- spatial_image@scale.factors$lowres
-  image_array <- spatial_image@image
+  image_scale <- if (!is.null(hires_image)) spatial_image@scale.factors$hires else spatial_image@scale.factors$lowres
+  image_array <- if (!is.null(hires_image)) hires_image else spatial_image@image
 
-  if (slice_index == 1L) writePNG(image_array, file.path(output_dir, shared_image_filename))
+  if (slice_index == 1L) {
+    if (!is.null(hires_image)) {
+      file.copy(hires_image_path, file.path(output_dir, shared_image_filename), overwrite = TRUE)
+    } else {
+      writePNG(image_array, file.path(output_dir, shared_image_filename))
+    }
+  }
   image_paths[[slice_name]] <- shared_image_path
   image_dimensions[[slice_name]] <- list(width = dim(image_array)[2], height = dim(image_array)[1])
 

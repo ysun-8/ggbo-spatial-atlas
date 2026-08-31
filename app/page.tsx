@@ -350,8 +350,9 @@ export default function Home() {
   const imageHeight = activeDimensions?.height ?? data.dataset.image_height ?? 2000;
   const imageSource = data.dataset.image ?? data.dataset.images?.[selectedSlice !== 'all' ? selectedSlice : sharedSlice ?? ''];
   const tissueImage = publicPath(imageSource ?? '/visium-a-histology.png');
-  const pointRadius = isHd ? 0.9 : 7.5;
-  const selectedPointRadius = isHd ? 2.2 : 11;
+  const hdImageScale = isHd ? imageWidth / 600 : 1;
+  const pointRadius = isHd ? 0.9 * hdImageScale : 7.5;
+  const selectedPointRadius = isHd ? 2.2 * hdImageScale : 11;
   const activeGradient = gradientOptions.find((option) => option.id === gradientId) ?? gradientOptions[0];
   const gradientCss = `linear-gradient(90deg, ${activeGradient.stops.join(', ')})`;
 
