@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CircleDot,
   Crosshair,
@@ -122,9 +122,10 @@ function hexToRgb(hex: string) {
   return [0, 2, 4].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16));
 }
 
+const gradientRgb = Object.fromEntries(gradientOptions.map((gradient) => [gradient.id, gradient.stops.map(hexToRgb)]));
+
 function interpolateColor(value: number, gradientId: GradientId) {
-  const gradient = gradientOptions.find((option) => option.id === gradientId) ?? gradientOptions[0];
-  const stops = gradient.stops.map(hexToRgb);
+  const stops = gradientRgb[gradientId];
   const position = Math.min(1, Math.max(0, value)) * (stops.length - 1);
   const index = Math.min(stops.length - 2, Math.floor(position));
   const fraction = position - index;
@@ -161,13 +162,30 @@ export default function Home() {
   const [search, setSearch] = useState('');
   const dragStart = useRef<{ pointerX: number; pointerY: number; cameraX: number; cameraY: number; spotId: string | null } | null>(null);
   const didDrag = useRef(false);
+  const cameraFrame = useRef<number | null>(null);
+  const pendingCamera = useRef<typeof camera | null>(null);
+
+  useEffect(() => () => {
+    if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
+  }, []);
+
+  const scheduleCamera = useCallback((next: typeof camera) => {
+    pendingCamera.current = next;
+    if (cameraFrame.current !== null) return;
+    cameraFrame.current = requestAnimationFrame(() => {
+      cameraFrame.current = null;
+      if (pendingCamera.current) setCamera(pendingCamera.current);
+      pendingCamera.current = null;
+    });
+  }, []);
+
   const geneChunkCache = useRef(new Map<string, Promise<ArrayBuffer>>());
 
   useEffect(() => {
     const selectedDataset = datasetOptions.find((dataset) => dataset.id === datasetId) ?? datasetOptions[0];
     setData(null);
     fetch(publicPath(selectedDataset.path))
-      .then((response) => response.json())
+      .then((response) => response.json() as Promise<VisiumData>)
       .then((payload: VisiumData) => {
         setData(payload);
         setSelectedSlice(payload.dataset.slices && payload.dataset.slices.length > 1 ? 'all' : payload.dataset.slices?.[0] ?? 'all');
@@ -234,24 +252,27 @@ export default function Home() {
     );
   }, [data, lineFilter, selectedSlice]);
 
-  const selectedGeneStats = data?.genes.find((gene) => gene.gene === selectedGene);
-  const matchingGenes = data?.genes.filter((gene) => gene.gene.toLowerCase().includes(search.toLowerCase())) ?? [];
+  const selectedGeneStats = useMemo(() => data?.genes.find((gene) => gene.gene === selectedGene), [data, selectedGene]);
+  const matchingGenes = useMemo(() => {
+    const query = search.toLowerCase();
+    return data?.genes.filter((gene) => gene.gene.toLowerCase().includes(query)) ?? [];
+  }, [data, search]);
   const visibleGenes = matchingGenes.slice(0, search ? 60 : 12);
 
-  const getIdentityColor = (identity: string) => {
+  const getIdentityColor = useCallback((identity: string) => {
     if (identityColors[identity]) return identityColors[identity];
     const identityIndex = data?.dataset.identities.indexOf(identity) ?? 0;
     return fallbackIdentityColors[identityIndex % fallbackIdentityColors.length];
-  };
+  }, [data]);
 
-  const getSpotColor = (spot: Spot) => {
-    if (displayMode === 'identity') return getIdentityColor(spot.identity);
+  const spotColors = useMemo(() => new Map(filteredSpots.map((spot) => {
+    if (displayMode === 'identity') return [spot.id, getIdentityColor(spot.identity)] as const;
     const ceiling = selectedGeneStats?.q95 || selectedGeneStats?.max || 1;
     const value = data?.dataset.gene_data_path && spot.index !== undefined
       ? geneValues?.[spot.index] ?? 0
       : spot.expression?.[selectedGene] ?? 0;
-    return interpolateColor(value / ceiling, gradientId);
-  };
+    return [spot.id, interpolateColor(value / ceiling, gradientId)] as const;
+  })), [filteredSpots, displayMode, getIdentityColor, selectedGeneStats, data, geneValues, selectedGene, gradientId]);
 
   const getSelectedExpression = (spot: Spot) => {
     if (data?.dataset.gene_data_path && spot.index !== undefined) return geneValues?.[spot.index] ?? 0;
@@ -299,17 +320,22 @@ export default function Home() {
     const deltaX = event.clientX - dragStart.current.pointerX;
     const deltaY = event.clientY - dragStart.current.pointerY;
     if (Math.hypot(deltaX, deltaY) > 3) didDrag.current = true;
-    setCamera((current) => ({
-      ...current,
-      x: dragStart.current!.cameraX + deltaX,
-      y: dragStart.current!.cameraY + deltaY,
-    }));
+    scheduleCamera({
+      ...camera,
+      x: dragStart.current.cameraX + deltaX,
+      y: dragStart.current.cameraY + deltaY,
+    });
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    // Commit the final drag position before a subsequent reset or zoom action.
+    if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
+    cameraFrame.current = null;
+    if (pendingCamera.current) setCamera(pendingCamera.current);
+    pendingCamera.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     const clickedSpotId = dragStart.current?.spotId;
-    if (!didDrag.current && clickedSpotId) {
+    if (event.type !== 'pointercancel' && !didDrag.current && clickedSpotId) {
       const clickedSpot = data?.spots.find((spot) => spot.id === clickedSpotId);
       if (clickedSpot) setSelectedSpot(clickedSpot);
     }
@@ -330,6 +356,49 @@ export default function Home() {
     };
   }, [data]);
 
+  const isHd = data?.dataset.kind === 'hd';
+  const observationSingular = data?.dataset.observation_label ?? (isHd ? 'cell' : 'spot');
+  const observationPlural = observationSingular === 'cell' ? 'cells' : 'spots';
+  const sharedSlice = data?.dataset.slices?.[0];
+  const activeDimensions = data?.dataset.image_dimensions?.[selectedSlice !== 'all' ? selectedSlice : sharedSlice ?? ''];
+  const imageWidth = activeDimensions?.width ?? data?.dataset.image_width ?? 2000;
+  const imageHeight = activeDimensions?.height ?? data?.dataset.image_height ?? 2000;
+  const imageSource = data?.dataset.image ?? data?.dataset.images?.[selectedSlice !== 'all' ? selectedSlice : sharedSlice ?? ''];
+  const tissueImage = publicPath(imageSource ?? '/visium-a-histology.png');
+  const hdImageScale = isHd ? imageWidth / 600 : 1;
+  const pointRadius = isHd ? 0.9 * hdImageScale : 7.5;
+  const selectedPointRadius = isHd ? 2.2 * hdImageScale : 11;
+  const activeGradient = gradientOptions.find((option) => option.id === gradientId) ?? gradientOptions[0];
+  const gradientCss = `linear-gradient(90deg, ${activeGradient.stops.join(', ')})`;
+
+  // Camera and search updates reuse these dense layers without rebuilding points.
+  const spatialPanel = useMemo(() => {
+    return (
+      <div className="relative min-w-0 overflow-hidden rounded-xl bg-white shadow-inner" style={{ aspectRatio: `${imageWidth} / ${imageHeight}` }}>
+        <img src={tissueImage} alt={`H and E image for ${data?.dataset.name}`} draggable={false} className="pointer-events-none absolute inset-0 size-full object-contain" style={{ opacity: imageOpacity / 100 }} />
+        <svg className="absolute inset-0 size-full" viewBox={`0 0 ${imageWidth} ${imageHeight}`} role="img" aria-label="Spatial gene expression overlay" shapeRendering="geometricPrecision">
+          {filteredSpots.map((spot) => {
+            const isSelected = selectedSpot?.id === spot.id;
+            return (
+              <circle key={spot.id} data-spot-id={spot.id} cx={spot.x} cy={spot.y} r={isSelected ? selectedPointRadius : pointRadius} fill={spotColors.get(spot.id)} fillOpacity={spotOpacity / 100} stroke={isSelected ? '#fff' : (isHd ? 'transparent' : 'rgba(24,18,26,0.38)')} strokeWidth={isSelected ? (isHd ? 0.9 : 4) : (isHd ? 2 : 1.2)} vectorEffect="non-scaling-stroke" className={isHd ? 'cursor-pointer' : 'cursor-pointer transition-[r,stroke-width] hover:stroke-white'} />
+            );
+          })}
+        </svg>
+      </div>
+    );
+  }, [imageWidth, imageHeight, tissueImage, data, imageOpacity, filteredSpots, selectedSpot, selectedPointRadius, pointRadius, spotColors, spotOpacity, isHd]);
+
+  const umapPanel = useMemo(() => (
+    <svg viewBox="0 0 240 180" className="w-full rounded-lg bg-[#f5f2ed]" aria-label={`UMAP of visible Visium ${observationPlural}`} shapeRendering="geometricPrecision">
+      {umapBounds && filteredSpots.map((spot) => {
+        const x = 14 + ((spot.umap_x - umapBounds.minX) / (umapBounds.maxX - umapBounds.minX)) * 212;
+        const y = 166 - ((spot.umap_y - umapBounds.minY) / (umapBounds.maxY - umapBounds.minY)) * 152;
+        const isSelected = selectedSpot?.id === spot.id;
+        return <circle key={spot.id} cx={x} cy={y} r={isSelected ? (isHd ? 3.2 : 4.5) : (isHd ? 1 : 1.8)} fill={spotColors.get(spot.id)} opacity={isSelected ? 1 : 0.76} stroke={isSelected ? '#fff' : 'none'} strokeWidth={isHd ? 1.2 : 2} vectorEffect="non-scaling-stroke" onClick={() => setSelectedSpot(spot)} className="cursor-pointer" />;
+      })}
+    </svg>
+  ), [observationPlural, umapBounds, filteredSpots, selectedSpot, isHd, spotColors]);
+
   if (!data) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#f4f1ec] text-[#22201d]">
@@ -340,37 +409,6 @@ export default function Home() {
       </main>
     );
   }
-
-  const isHd = data.dataset.kind === 'hd';
-  const observationSingular = data.dataset.observation_label ?? (isHd ? 'cell' : 'spot');
-  const observationPlural = observationSingular === 'cell' ? 'cells' : 'spots';
-  const sharedSlice = data.dataset.slices?.[0];
-  const activeDimensions = data.dataset.image_dimensions?.[selectedSlice !== 'all' ? selectedSlice : sharedSlice ?? ''];
-  const imageWidth = activeDimensions?.width ?? data.dataset.image_width ?? 2000;
-  const imageHeight = activeDimensions?.height ?? data.dataset.image_height ?? 2000;
-  const imageSource = data.dataset.image ?? data.dataset.images?.[selectedSlice !== 'all' ? selectedSlice : sharedSlice ?? ''];
-  const tissueImage = publicPath(imageSource ?? '/visium-a-histology.png');
-  const hdImageScale = isHd ? imageWidth / 600 : 1;
-  const pointRadius = isHd ? 0.9 * hdImageScale : 7.5;
-  const selectedPointRadius = isHd ? 2.2 * hdImageScale : 11;
-  const activeGradient = gradientOptions.find((option) => option.id === gradientId) ?? gradientOptions[0];
-  const gradientCss = `linear-gradient(90deg, ${activeGradient.stops.join(', ')})`;
-
-  const spatialPanel = () => {
-    return (
-      <div className="relative min-w-0 overflow-hidden rounded-xl bg-white shadow-inner" style={{ aspectRatio: `${imageWidth} / ${imageHeight}` }}>
-        <img src={tissueImage} alt={`H and E image for ${data.dataset.name}`} draggable={false} className="pointer-events-none absolute inset-0 size-full object-contain" style={{ opacity: imageOpacity / 100 }} />
-        <svg className="absolute inset-0 size-full" viewBox={`0 0 ${imageWidth} ${imageHeight}`} role="img" aria-label="Spatial gene expression overlay" shapeRendering="geometricPrecision">
-          {filteredSpots.map((spot) => {
-            const isSelected = selectedSpot?.id === spot.id;
-            return (
-              <circle key={spot.id} data-spot-id={spot.id} cx={spot.x} cy={spot.y} r={isSelected ? selectedPointRadius : pointRadius} fill={getSpotColor(spot)} fillOpacity={spotOpacity / 100} stroke={isSelected ? '#fff' : (isHd ? 'transparent' : 'rgba(24,18,26,0.38)')} strokeWidth={isSelected ? (isHd ? 0.9 : 4) : (isHd ? 2 : 1.2)} vectorEffect="non-scaling-stroke" className={isHd ? 'cursor-pointer' : 'cursor-pointer transition-[r,stroke-width] hover:stroke-white'} />
-            );
-          })}
-        </svg>
-      </div>
-    );
-  };
 
   return (
     <main className="min-h-screen bg-[#f3f0ea] text-[#201e1b]">
@@ -514,7 +552,7 @@ export default function Home() {
             onPointerCancel={handlePointerUp}
           >
             <div className="w-full max-w-[min(74vh,900px)] shrink-0" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`, transformOrigin: 'center' }}>
-              {spatialPanel()}
+              {spatialPanel}
             </div>
 
             <div className="absolute bottom-4 left-4 rounded-xl border border-black/10 bg-[#fffefa]/95 p-3 shadow-md backdrop-blur">
@@ -533,14 +571,7 @@ export default function Home() {
         <aside className="border-t border-[#d7d0c5] bg-[#fbfaf7] p-3 xl:overflow-y-auto xl:border-l xl:border-t-0">
           <div className="mb-3 rounded-xl border border-[#d7d0c5] bg-white p-3">
             <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold">Linked UMAP</p><span className="text-[10px] text-[#8a8179]">{isHd ? 'SCT UMAP' : 'Integrated CCA'}</span></div>
-            <svg viewBox="0 0 240 180" className="w-full rounded-lg bg-[#f5f2ed]" aria-label={`UMAP of visible Visium ${observationPlural}`} shapeRendering="geometricPrecision">
-              {umapBounds && filteredSpots.map((spot) => {
-                const x = 14 + ((spot.umap_x - umapBounds.minX) / (umapBounds.maxX - umapBounds.minX)) * 212;
-                const y = 166 - ((spot.umap_y - umapBounds.minY) / (umapBounds.maxY - umapBounds.minY)) * 152;
-                const isSelected = selectedSpot?.id === spot.id;
-                return <circle key={spot.id} cx={x} cy={y} r={isSelected ? (isHd ? 3.2 : 4.5) : (isHd ? 1 : 1.8)} fill={getSpotColor(spot)} opacity={isSelected ? 1 : 0.76} stroke={isSelected ? '#fff' : 'none'} strokeWidth={isHd ? 1.2 : 2} vectorEffect="non-scaling-stroke" onClick={() => setSelectedSpot(spot)} className="cursor-pointer" />;
-              })}
-            </svg>
+            {umapPanel}
           </div>
 
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Crosshair className="size-4 text-[#8f315d]" />{observationSingular === 'cell' ? 'Cell' : 'Spot'} inspector</div>
