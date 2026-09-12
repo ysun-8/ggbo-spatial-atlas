@@ -84,7 +84,8 @@ const identityColors: Record<string, string> = {
 
 const fallbackIdentityColors = ['#4d908e', '#f8961e', '#b56576', '#577590', '#8f6bb3'];
 const minZoom = 0.8;
-const maxZoom = 3;
+const regularMaxZoom = 3;
+const hdMaxZoom = 20;
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
 function publicPath(path: string) {
@@ -157,6 +158,10 @@ export default function Home() {
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [imageOpacity, setImageOpacity] = useState(88);
   const [spotOpacity, setSpotOpacity] = useState(84);
+  const [hdDotSize, setHdDotSize] = useState(100);
+  const spatialViewport = useRef<HTMLDivElement | null>(null);
+  const [viewportWidth, setViewportWidth] = useState(0);
+  const maxZoom = data?.dataset.kind === 'hd' ? hdMaxZoom : regularMaxZoom;
   const [camera, setCamera] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
   const [search, setSearch] = useState('');
@@ -178,6 +183,14 @@ export default function Home() {
       pendingCamera.current = null;
     });
   }, []);
+
+  useEffect(() => {
+    const element = spatialViewport.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => setViewportWidth(entry.contentRect.width));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [data]);
 
   const geneChunkCache = useRef(new Map<string, Promise<ArrayBuffer>>());
 
@@ -280,7 +293,11 @@ export default function Home() {
   };
 
   const zoomAtCenter = (nextScale: number) => {
-    setCamera((current) => ({ ...current, scale: Math.min(maxZoom, Math.max(minZoom, nextScale)) }));
+    setCamera((current) => {
+      const scale = Math.min(maxZoom, Math.max(minZoom, nextScale));
+      const ratio = scale / current.scale;
+      return { x: current.x * ratio, y: current.y * ratio, scale };
+    });
   };
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
@@ -366,25 +383,29 @@ export default function Home() {
   const imageSource = data?.dataset.image ?? data?.dataset.images?.[selectedSlice !== 'all' ? selectedSlice : sharedSlice ?? ''];
   const tissueImage = publicPath(imageSource ?? '/visium-a-histology.png');
   const hdImageScale = isHd ? imageWidth / 600 : 1;
-  const pointRadius = isHd ? 0.9 * hdImageScale : 7.5;
-  const selectedPointRadius = isHd ? 2.2 * hdImageScale : 11;
+  const pointRadius = isHd ? 0.9 * hdImageScale * hdDotSize / 100 : 7.5;
+  const selectedPointRadius = isHd ? Math.max(pointRadius * 1.5, 1.2 * hdImageScale) : 11;
+  const viewWidth = imageWidth / camera.scale;
+  const viewHeight = imageHeight / camera.scale;
+  const imageUnitsPerPixel = imageWidth / (viewportWidth || imageWidth) / camera.scale;
+  const spatialViewBox = `${(imageWidth - viewWidth) / 2 - camera.x * imageUnitsPerPixel} ${(imageHeight - viewHeight) / 2 - camera.y * imageUnitsPerPixel} ${viewWidth} ${viewHeight}`;
   const activeGradient = gradientOptions.find((option) => option.id === gradientId) ?? gradientOptions[0];
   const gradientCss = `linear-gradient(90deg, ${activeGradient.stops.join(', ')})`;
 
   // Camera and search updates reuse these dense layers without rebuilding points.
   const spatialPanel = useMemo(() => {
     return (
-      <div className="relative min-w-0 overflow-hidden rounded-xl bg-white shadow-inner" style={{ aspectRatio: `${imageWidth} / ${imageHeight}` }}>
-        <img src={tissueImage} alt={`H and E image for ${data?.dataset.name}`} draggable={false} className="pointer-events-none absolute inset-0 size-full object-contain" style={{ opacity: imageOpacity / 100 }} />
-        <svg className="absolute inset-0 size-full" viewBox={`0 0 ${imageWidth} ${imageHeight}`} role="img" aria-label="Spatial gene expression overlay" shapeRendering="geometricPrecision">
+      <g>
+        <image href={tissueImage} width={imageWidth} height={imageHeight} opacity={imageOpacity / 100} className="pointer-events-none" />
+        <g>
           {filteredSpots.map((spot) => {
             const isSelected = selectedSpot?.id === spot.id;
             return (
               <circle key={spot.id} data-spot-id={spot.id} cx={spot.x} cy={spot.y} r={isSelected ? selectedPointRadius : pointRadius} fill={spotColors.get(spot.id)} fillOpacity={spotOpacity / 100} stroke={isSelected ? '#fff' : (isHd ? 'transparent' : 'rgba(24,18,26,0.38)')} strokeWidth={isSelected ? (isHd ? 0.9 : 4) : (isHd ? 2 : 1.2)} vectorEffect="non-scaling-stroke" className={isHd ? 'cursor-pointer' : 'cursor-pointer transition-[r,stroke-width] hover:stroke-white'} />
             );
           })}
-        </svg>
-      </div>
+        </g>
+      </g>
     );
   }, [imageWidth, imageHeight, tissueImage, data, imageOpacity, filteredSpots, selectedSpot, selectedPointRadius, pointRadius, spotColors, spotOpacity, isHd]);
 
@@ -495,6 +516,12 @@ export default function Home() {
             </div>
           </section>
 
+          {isHd && <section className="mt-3.5 space-y-1.5">
+            <label className="flex items-center justify-between text-xs" htmlFor="hd-dot-size"><span className="control-label">Cell dot size</span><span>{hdDotSize}%</span></label>
+            <input id="hd-dot-size" className="atlas-range w-full" type="range" min="25" max="150" step="5" value={hdDotSize} onChange={(event) => setHdDotSize(Number(event.target.value))} />
+            <p className="text-[10px] text-[#91877d]">Display markers show cell centers, not cell boundaries. HD zoom supports up to 20×.</p>
+          </section>}
+
           <section className="mt-3.5 space-y-1.5">
             <div className="flex items-center justify-between">
               <p className="control-label">Gene</p>
@@ -536,9 +563,9 @@ export default function Home() {
               </label>
             </div>
             <div className="flex items-center justify-self-start rounded-lg border border-[#d7d0c5] bg-[#fbfaf7] p-1 shadow-sm lg:justify-self-end">
-              <Button variant="ghost" size="icon-sm" aria-label="Zoom out" onClick={() => zoomAtCenter(camera.scale - 0.2)}><Minus /></Button>
+              <Button variant="ghost" size="icon-sm" aria-label="Zoom out" onClick={() => zoomAtCenter(isHd ? camera.scale / 1.25 : camera.scale - 0.2)}><Minus /></Button>
               <span className="w-12 text-center text-[11px] font-medium text-[#6d655e]">{Math.round(camera.scale * 100)}%</span>
-              <Button variant="ghost" size="icon-sm" aria-label="Zoom in" onClick={() => zoomAtCenter(camera.scale + 0.2)}><Plus /></Button>
+              <Button variant="ghost" size="icon-sm" aria-label="Zoom in" onClick={() => zoomAtCenter(isHd ? camera.scale * 1.25 : camera.scale + 0.2)}><Plus /></Button>
               <Button variant="ghost" size="icon-sm" aria-label="Reset view" onClick={() => setCamera({ x: 0, y: 0, scale: 1 })}><RotateCcw /></Button>
             </div>
           </div>
@@ -551,8 +578,10 @@ export default function Home() {
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
           >
-            <div className="w-full max-w-[min(74vh,900px)] shrink-0" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`, transformOrigin: 'center' }}>
-              {spatialPanel}
+            <div ref={spatialViewport} className="w-full max-w-[min(74vh,900px)] shrink-0" style={{ aspectRatio: `${imageWidth} / ${imageHeight}` }}>
+              <svg className="size-full overflow-visible" viewBox={spatialViewBox} role="img" aria-label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} shapeRendering="geometricPrecision">
+                {spatialPanel}
+              </svg>
             </div>
 
             <div className="absolute bottom-4 left-4 rounded-xl border border-black/10 bg-[#fffefa]/95 p-3 shadow-md backdrop-blur">
