@@ -152,10 +152,17 @@ export default function Home() {
   const [selectedGene, setSelectedGene] = useState('CA9');
   const [displayMode, setDisplayMode] = useState<'gene' | 'identity'>('identity');
   const [gradientId, setGradientId] = useState<GradientId>('seurat');
-  const [geneValues, setGeneValues] = useState<Float32Array | null>(null);
+  const [geneResult, setGeneResult] = useState<{ data: VisiumData; gene: string; values: Float32Array } | null>(null);
+  const geneValues = geneResult?.data === data && geneResult.gene === selectedGene ? geneResult.values : null;
+  const [datasetError, setDatasetError] = useState(false);
+  const [geneError, setGeneError] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const [geneRetry, setGeneRetry] = useState(0);
+
   const [geneLoading, setGeneLoading] = useState(false);
   const [lineFilter, setLineFilter] = useState('all');
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
+  const needsExpression = displayMode === 'gene' || selectedSpot !== null;
   const [imageOpacity, setImageOpacity] = useState(88);
   const [spotOpacity, setSpotOpacity] = useState(84);
   const [hdDotSize, setHdDotSize] = useState(100);
@@ -165,7 +172,7 @@ export default function Home() {
   const [camera, setCamera] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
   const [search, setSearch] = useState('');
-  const dragStart = useRef<{ pointerX: number; pointerY: number; cameraX: number; cameraY: number; spotId: string | null } | null>(null);
+  const dragStart = useRef<{ pointerId: number; pointerX: number; pointerY: number; cameraX: number; cameraY: number; spotId: string | null } | null>(null);
   const didDrag = useRef(false);
   const cameraFrame = useRef<number | null>(null);
   const pendingCamera = useRef<typeof camera | null>(null);
@@ -196,31 +203,45 @@ export default function Home() {
 
   useEffect(() => {
     const selectedDataset = datasetOptions.find((dataset) => dataset.id === datasetId) ?? datasetOptions[0];
+    const controller = new AbortController();
     setData(null);
-    fetch(publicPath(selectedDataset.path))
-      .then((response) => response.json() as Promise<VisiumData>)
+    setDatasetError(false);
+    fetch(publicPath(selectedDataset.path), { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error('Dataset unavailable');
+        return response.json() as Promise<VisiumData>;
+      })
       .then((payload: VisiumData) => {
+        if (controller.signal.aborted) return;
         setData(payload);
         setSelectedSlice(payload.dataset.slices && payload.dataset.slices.length > 1 ? 'all' : payload.dataset.slices?.[0] ?? 'all');
         setSelectedGene(payload.genes.some((gene) => gene.gene === 'CA9') ? 'CA9' : payload.genes[0]?.gene ?? '');
         setDisplayMode('identity');
-        setGeneValues(null);
+        setGeneResult(null);
+        setGeneError(false);
         setGeneLoading(false);
         setLineFilter(payload.dataset.lines.length === 1 ? payload.dataset.lines[0] : 'all');
         setSelectedSpot(null);
         setCamera({ x: 0, y: 0, scale: 1 });
         setSearch('');
-      });
-  }, [datasetId]);
+      })
+      .catch(() => { if (!controller.signal.aborted) setDatasetError(true); });
+    return () => controller.abort();
+  }, [datasetId, retry]);
 
   useEffect(() => {
-    if (!data || displayMode !== 'gene' || !data.dataset.gene_data_path) {
+    if (!data || !needsExpression || !data.dataset.gene_data_path) {
       setGeneLoading(false);
       return;
     }
 
     const stats = data.genes.find((gene) => gene.gene === selectedGene);
-    if (!stats?.chunk || stats.offset === undefined) return;
+    if (!stats?.chunk || stats.offset === undefined) {
+      setGeneResult(null);
+      setGeneLoading(false);
+      setGeneError(true);
+      return;
+    }
 
     let active = true;
     const chunkUrl = publicPath(`${data.dataset.gene_data_path}/${stats.chunk}`);
@@ -233,7 +254,8 @@ export default function Home() {
       geneChunkCache.current.set(chunkUrl, request);
     }
 
-    setGeneValues(null);
+    setGeneResult(null);
+    setGeneError(false);
     setGeneLoading(true);
     request
       .then((buffer) => {
@@ -245,17 +267,19 @@ export default function Home() {
           const cellIndex = view.getUint16(stats.offset! + valueIndex * 2, true);
           values[cellIndex] = Math.log1p(view.getUint8(countsOffset + valueIndex));
         }
-        setGeneValues(values);
+        setGeneResult({ data, gene: selectedGene, values });
         setGeneLoading(false);
       })
       .catch(() => {
+        geneChunkCache.current.delete(chunkUrl);
         if (!active) return;
-        setGeneValues(new Float32Array(data.spots.length));
+        setGeneError(true);
+        setGeneResult(null);
         setGeneLoading(false);
       });
 
     return () => { active = false; };
-  }, [data, displayMode, selectedGene]);
+  }, [data, needsExpression, selectedGene, geneRetry]);
 
   const filteredSpots = useMemo(() => {
     if (!data) return [];
@@ -280,6 +304,7 @@ export default function Home() {
 
   const spotColors = useMemo(() => new Map(filteredSpots.map((spot) => {
     if (displayMode === 'identity') return [spot.id, getIdentityColor(spot.identity)] as const;
+    if (data?.dataset.gene_data_path && !geneValues) return [spot.id, '#b5b5b5'] as const;
     const ceiling = selectedGeneStats?.q95 || selectedGeneStats?.max || 1;
     const value = data?.dataset.gene_data_path && spot.index !== undefined
       ? geneValues?.[spot.index] ?? 0
@@ -288,7 +313,7 @@ export default function Home() {
   })), [filteredSpots, displayMode, getIdentityColor, selectedGeneStats, data, geneValues, selectedGene, gradientId]);
 
   const getSelectedExpression = (spot: Spot) => {
-    if (data?.dataset.gene_data_path && spot.index !== undefined) return geneValues?.[spot.index] ?? 0;
+    if (data?.dataset.gene_data_path && spot.index !== undefined) return geneValues?.[spot.index] ?? null;
     return spot.expression?.[selectedGene] ?? 0;
   };
 
@@ -302,6 +327,7 @@ export default function Home() {
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault();
+    if (dragStart.current) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     const cursorX = event.clientX - bounds.left - bounds.width / 2;
     const cursorY = event.clientY - bounds.top - bounds.height / 2;
@@ -318,10 +344,11 @@ export default function Home() {
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || !event.isPrimary || dragStart.current) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const spotId = (event.target as SVGElement).getAttribute?.('data-spot-id') ?? null;
     dragStart.current = {
+      pointerId: event.pointerId,
       pointerX: event.clientX,
       pointerY: event.clientY,
       cameraX: camera.x,
@@ -333,7 +360,7 @@ export default function Home() {
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragStart.current) return;
+    if (!dragStart.current || dragStart.current.pointerId !== event.pointerId) return;
     const deltaX = event.clientX - dragStart.current.pointerX;
     const deltaY = event.clientY - dragStart.current.pointerY;
     if (Math.hypot(deltaX, deltaY) > 3) didDrag.current = true;
@@ -345,6 +372,7 @@ export default function Home() {
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStart.current || dragStart.current.pointerId !== event.pointerId) return;
     // Commit the final drag position before a subsequent reset or zoom action.
     if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
     cameraFrame.current = null;
@@ -425,7 +453,7 @@ export default function Home() {
       <main className="grid min-h-screen place-items-center bg-[#f4f1ec] text-[#22201d]">
         <div className="flex items-center gap-3 rounded-xl border border-black/10 bg-white px-5 py-4 shadow-sm">
           <CircleDot className="size-5 animate-pulse text-[#9c3f68]" />
-          <span className="text-sm font-medium">Loading spatial run…</span>
+          {datasetError ? <div role="alert"><p className="text-sm font-medium">Unable to load this dataset.</p><Button className="mt-2" onClick={() => setRetry((value) => value + 1)}>Retry</Button></div> : <span className="text-sm font-medium">Loading spatial run…</span>}
         </div>
       </main>
     );
@@ -538,6 +566,7 @@ export default function Home() {
                 </Button>
               ))}
             </div>
+            {geneError && <div role="alert" className="text-xs text-[#96345f]">Expression unavailable. <button className="underline" onClick={() => setGeneRetry((value) => value + 1)}>Retry</button></div>}
             {matchingGenes.length > visibleGenes.length && <p className="text-[10px] text-[#91877d]">Type to search {formatNumber(matchingGenes.length)} available genes.</p>}
           </section>
 
@@ -586,7 +615,7 @@ export default function Home() {
 
             <div className="absolute bottom-4 left-4 rounded-xl border border-black/10 bg-[#fffefa]/95 p-3 shadow-md backdrop-blur">
               {displayMode === 'gene' ? (
-                <><div className="mb-2 flex items-center justify-between gap-6 text-[12px] font-medium"><span>{selectedGene}</span><span className="text-[#7d746c]">{geneLoading ? 'Loading…' : '0 – q95'}</span></div><div className="h-3 w-48 rounded-full" style={{ background: gradientCss }} /></>
+                <><div className="mb-2 flex items-center justify-between gap-6 text-[12px] font-medium"><span>{selectedGene}</span><span className="text-[#7d746c]">{geneError ? 'Unavailable' : geneLoading || (isHd && !geneValues) ? 'Loading…' : `0 – ${(selectedGeneStats?.q95 || selectedGeneStats?.max || 0).toFixed(2)}`}</span></div><div className="h-3 w-48 rounded-full" style={{ background: gradientCss }} /></>
               ) : (
                 <div className="flex max-w-72 flex-wrap gap-x-4 gap-y-2">
                   {data.dataset.identities.map((identity) => <span key={identity} className="flex items-center gap-2 text-[13px] font-medium"><i className="size-3 rounded-full" style={{ background: getIdentityColor(identity) }} />{identity}</span>)}
@@ -617,7 +646,7 @@ export default function Home() {
                 <Metric label="UMIs" value={formatNumber(selectedSpot.counts)} />
                 <Metric label="Genes" value={formatNumber(selectedSpot.features)} />
                 <Metric label="Mito" value={`${selectedSpot.mito.toFixed(1)}%`} />
-                <Metric label={selectedGene} value={geneLoading ? '…' : getSelectedExpression(selectedSpot).toFixed(2)} accent />
+                <Metric label={selectedGene} value={geneLoading ? '…' : (getSelectedExpression(selectedSpot)?.toFixed(2) ?? (geneError ? 'Unavailable' : '…'))} accent />
               </div>
               {!isHd && <div className="rounded-xl border border-[#d7d0c5] bg-white p-3.5">
                 <p className="mb-3 text-xs font-semibold">Selected expression</p>
