@@ -14,6 +14,10 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import catalog from '@/atlas/catalog.json';
+import { decodeExpression, validateSpatialData, filterCaptureSpots } from '@/lib/atlas-format.mjs';
+
+type Capture = (typeof catalog.datasets)[number]['captures'][number];
 
 type GeneStat = {
   gene: string;
@@ -50,8 +54,8 @@ type VisiumData = {
     name: string;
     cohort: string;
     technology: string;
-    kind?: 'regular' | 'hd';
-    observation_label?: 'spot' | 'cell';
+    kind?: string;
+    observation_label?: string;
     image_width?: number;
     image_height?: number;
     spot_diameter?: number;
@@ -64,6 +68,12 @@ type VisiumData = {
     images?: Record<string, string>;
     image_dimensions?: Record<string, { width: number; height: number }>;
     gene_data_path?: string;
+    captures: Capture[];
+    expression: { assay: string; layer: string; encoding: string };
+    embedding: string;
+    embedding_label: string;
+    tissue_type: string;
+    description: string;
   };
   genes: GeneStat[];
   spots: Spot[];
@@ -93,10 +103,10 @@ function publicPath(path: string) {
   return `${basePath}${path}`;
 }
 
-const datasetOptions = [
-  { id: 'visium-a', label: 'Regular Visium A', path: '/data/visium-a.json' },
-  { id: 'hd-12163', label: 'Visium HD · UP-12163', path: '/data/hd-12163.json' },
-];
+const datasetOptions = catalog.datasets;
+if (catalog.schema_version !== 2 || !datasetOptions.length || new Set(datasetOptions.map((entry) => entry.id)).size !== datasetOptions.length || !datasetOptions.some((entry) => entry.id === catalog.default_dataset)) {
+  throw new Error('Invalid dataset catalog');
+}
 
 const gradientOptions = [
   {
@@ -147,7 +157,9 @@ function formatGboLine(value: string) {
 
 export default function Home() {
   const [data, setData] = useState<VisiumData | null>(null);
-  const [datasetId, setDatasetId] = useState('hd-12163');
+  const [datasetId, setDatasetId] = useState(catalog.default_dataset);
+  const [selectedCaptureId, setSelectedCaptureId] = useState('');
+  const activeCapture = data?.dataset.captures.find((capture) => capture.id === selectedCaptureId) ?? data?.dataset.captures[0];
   const [selectedSlice, setSelectedSlice] = useState('all');
   const [selectedGene, setSelectedGene] = useState('CA9');
   const [displayMode, setDisplayMode] = useState<'gene' | 'identity'>('identity');
@@ -213,8 +225,20 @@ export default function Home() {
       })
       .then((payload: VisiumData) => {
         if (controller.signal.aborted) return;
-        setData(payload);
-        setSelectedSlice(payload.dataset.slices && payload.dataset.slices.length > 1 ? 'all' : payload.dataset.slices?.[0] ?? 'all');
+        const preferredGenes = selectedDataset.expression.featured_genes;
+        const geneRank = (gene: string) => { const index = preferredGenes.indexOf(gene); return index < 0 ? preferredGenes.length : index; };
+        payload.genes.sort((a, b) => geneRank(a.gene) - geneRank(b.gene) || a.gene.localeCompare(b.gene));
+        // Geometry and provenance are catalog-owned; encoding is payload-owned for versioned exports.
+        const merged = { ...payload, dataset: { ...payload.dataset, ...selectedDataset,
+          expression: { ...selectedDataset.expression, encoding: payload.dataset.expression?.encoding ?? selectedDataset.expression.encoding } } };
+        validateSpatialData(merged, merged.dataset.captures);
+        setData(merged);
+        setSelectedCaptureId(merged.dataset.captures[0].id);
+        geneChunkCache.current.clear();
+        if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
+        cameraFrame.current = null;
+        pendingCamera.current = null;
+        setSelectedSlice('all');
         setSelectedGene(payload.genes.some((gene) => gene.gene === 'CA9') ? 'CA9' : payload.genes[0]?.gene ?? '');
         setDisplayMode('identity');
         setGeneResult(null);
@@ -252,6 +276,10 @@ export default function Home() {
         return response.arrayBuffer();
       });
       geneChunkCache.current.set(chunkUrl, request);
+      if (geneChunkCache.current.size > 8) {
+        const oldest = geneChunkCache.current.keys().next().value;
+        if (oldest) geneChunkCache.current.delete(oldest);
+      }
     }
 
     setGeneResult(null);
@@ -260,13 +288,7 @@ export default function Home() {
     request
       .then((buffer) => {
         if (!active) return;
-        const values = new Float32Array(data.spots.length);
-        const view = new DataView(buffer);
-        const countsOffset = stats.offset! + stats.detected * 2;
-        for (let valueIndex = 0; valueIndex < stats.detected; valueIndex += 1) {
-          const cellIndex = view.getUint16(stats.offset! + valueIndex * 2, true);
-          values[cellIndex] = Math.log1p(view.getUint8(countsOffset + valueIndex));
-        }
+        const values = decodeExpression(buffer, stats, data.spots.length, data.dataset.expression.encoding);
         setGeneResult({ data, gene: selectedGene, values });
         setGeneLoading(false);
       })
@@ -283,11 +305,8 @@ export default function Home() {
 
   const filteredSpots = useMemo(() => {
     if (!data) return [];
-    return data.spots.filter((spot) =>
-      (lineFilter === 'all' || spot.line === lineFilter) &&
-      (selectedSlice === 'all' || spot.slice === selectedSlice),
-    );
-  }, [data, lineFilter, selectedSlice]);
+    return filterCaptureSpots(data.spots, activeCapture, selectedSlice, lineFilter) as Spot[];
+  }, [data, activeCapture, lineFilter, selectedSlice]);
 
   const selectedGeneStats = useMemo(() => data?.genes.find((gene) => gene.gene === selectedGene), [data, selectedGene]);
   const matchingGenes = useMemo(() => {
@@ -391,28 +410,35 @@ export default function Home() {
 
   const umapBounds = useMemo(() => {
     if (!data) return null;
-    const xs = data.spots.map((spot) => spot.umap_x);
-    const ys = data.spots.map((spot) => spot.umap_y);
-    return {
-      minX: Math.min(...xs),
-      maxX: Math.max(...xs),
-      minY: Math.min(...ys),
-      maxY: Math.max(...ys),
-    };
+    return data.spots.reduce((bounds, spot) => ({
+      minX: Math.min(bounds.minX, spot.umap_x), maxX: Math.max(bounds.maxX, spot.umap_x),
+      minY: Math.min(bounds.minY, spot.umap_y), maxY: Math.max(bounds.maxY, spot.umap_y),
+    }), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
   }, [data]);
 
   const isHd = data?.dataset.kind === 'hd';
   const observationSingular = data?.dataset.observation_label ?? (isHd ? 'cell' : 'spot');
   const observationPlural = observationSingular === 'cell' ? 'cells' : 'spots';
-  const sharedSlice = data?.dataset.slices?.[0];
-  const activeDimensions = data?.dataset.image_dimensions?.[selectedSlice !== 'all' ? selectedSlice : sharedSlice ?? ''];
-  const imageWidth = activeDimensions?.width ?? data?.dataset.image_width ?? 2000;
-  const imageHeight = activeDimensions?.height ?? data?.dataset.image_height ?? 2000;
-  const imageSource = data?.dataset.image ?? data?.dataset.images?.[selectedSlice !== 'all' ? selectedSlice : sharedSlice ?? ''];
-  const tissueImage = publicPath(imageSource ?? '/visium-a-histology.png');
-  const hdImageScale = isHd ? imageWidth / 600 : 1;
-  const pointRadius = isHd ? 0.9 * hdImageScale * hdDotSize / 100 : 7.5;
-  const selectedPointRadius = isHd ? Math.max(pointRadius * 1.5, 1.2 * hdImageScale) : 11;
+  const imageWidth = activeCapture?.width ?? 1;
+  const imageHeight = activeCapture?.height ?? 1;
+  const tissueImage = activeCapture ? publicPath(activeCapture.image) : '';
+  const pointRadius = (activeCapture?.marker_radius ?? 1) * (isHd ? hdDotSize / 100 : 1);
+  const selectedPointRadius = pointRadius * 1.5;
+  const [imageState, setImageState] = useState<{ key: string; status: 'loaded' | 'error' } | null>(null);
+  const [imageRetry, setImageRetry] = useState(0);
+  const imageKey = `${tissueImage}:${imageWidth}:${imageHeight}:${imageRetry}`;
+  const imageStatus = imageState?.key === imageKey ? imageState.status : 'loading';
+  useEffect(() => {
+    if (!tissueImage) return;
+    let active = true;
+    const image = new Image();
+    image.onload = () => {
+      if (active) setImageState({ key: imageKey, status: image.naturalWidth === imageWidth && image.naturalHeight === imageHeight ? 'loaded' : 'error' });
+    };
+    image.onerror = () => { if (active) setImageState({ key: imageKey, status: 'error' }); };
+    image.src = tissueImage;
+    return () => { active = false; image.onload = null; image.onerror = null; };
+  }, [tissueImage, imageWidth, imageHeight, imageKey]);
   const viewWidth = imageWidth / camera.scale;
   const viewHeight = imageHeight / camera.scale;
   const imageUnitsPerPixel = imageWidth / (viewportWidth || imageWidth) / camera.scale;
@@ -424,7 +450,7 @@ export default function Home() {
   const spatialPanel = useMemo(() => {
     return (
       <g>
-        <image href={tissueImage} width={imageWidth} height={imageHeight} opacity={imageOpacity / 100} className="pointer-events-none" />
+        <image key={tissueImage} href={tissueImage} width={imageWidth} height={imageHeight} opacity={imageOpacity / 100} className="pointer-events-none" />
         <g>
           {filteredSpots.map((spot) => {
             const isSelected = selectedSpot?.id === spot.id;
@@ -435,13 +461,13 @@ export default function Home() {
         </g>
       </g>
     );
-  }, [imageWidth, imageHeight, tissueImage, data, imageOpacity, filteredSpots, selectedSpot, selectedPointRadius, pointRadius, spotColors, spotOpacity, isHd]);
+  }, [imageWidth, imageHeight, tissueImage, imageOpacity, filteredSpots, selectedSpot, selectedPointRadius, pointRadius, spotColors, spotOpacity, isHd]);
 
   const umapPanel = useMemo(() => (
     <svg viewBox="0 0 240 180" className="w-full rounded-lg bg-[#f5f2ed]" aria-label={`UMAP of visible Visium ${observationPlural}`} shapeRendering="geometricPrecision">
       {umapBounds && filteredSpots.map((spot) => {
-        const x = 14 + ((spot.umap_x - umapBounds.minX) / (umapBounds.maxX - umapBounds.minX)) * 212;
-        const y = 166 - ((spot.umap_y - umapBounds.minY) / (umapBounds.maxY - umapBounds.minY)) * 152;
+        const x = 14 + ((spot.umap_x - umapBounds.minX) / (umapBounds.maxX - umapBounds.minX || 1)) * 212;
+        const y = 166 - ((spot.umap_y - umapBounds.minY) / (umapBounds.maxY - umapBounds.minY || 1)) * 152;
         const isSelected = selectedSpot?.id === spot.id;
         return <circle key={spot.id} cx={x} cy={y} r={isSelected ? (isHd ? 3.2 : 4.5) : (isHd ? 1 : 1.8)} fill={spotColors.get(spot.id)} opacity={isSelected ? 1 : 0.76} stroke={isSelected ? '#fff' : 'none'} strokeWidth={isHd ? 1.2 : 2} vectorEffect="non-scaling-stroke" onClick={() => setSelectedSpot(spot)} className="cursor-pointer" />;
       })}
@@ -491,7 +517,7 @@ export default function Home() {
             <p className="control-label">Dataset</p>
             <div className="grid gap-1.5">
               {datasetOptions.map((dataset) => (
-                <Button key={dataset.id} variant={datasetId === dataset.id ? 'default' : 'outline'} size="sm" className={datasetId === dataset.id ? 'justify-start bg-[#351d4a] hover:bg-[#351d4a]/90' : 'justify-start bg-white'} onClick={() => setDatasetId(dataset.id)}>
+                <Button key={dataset.id} variant={datasetId === dataset.id ? 'default' : 'outline'} size="sm" className={datasetId === dataset.id ? 'h-auto justify-start whitespace-normal py-2 text-left bg-[#351d4a] hover:bg-[#351d4a]/90' : 'h-auto justify-start whitespace-normal py-2 text-left bg-white'} onClick={() => setDatasetId(dataset.id)}>
                   {dataset.label}
                 </Button>
               ))}
@@ -506,13 +532,28 @@ export default function Home() {
             </div>
           </section>
 
-          {data.dataset.slices && data.dataset.slices.length > 1 && (
+          {data.dataset.captures.length > 1 && (
             <section className="mt-3.5 space-y-1.5">
               <p className="control-label">Capture area</p>
               <div className="flex flex-wrap gap-1.5">
-                {['all', ...data.dataset.slices].map((slice) => (
-                  <Button key={slice} variant={selectedSlice === slice ? 'default' : 'outline'} size="sm" className={selectedSlice === slice ? 'bg-[#9f3d6c] hover:bg-[#9f3d6c]/90' : 'bg-white'} onClick={() => { setSelectedSlice(slice); setSelectedSpot(null); setCamera({ x: 0, y: 0, scale: 1 }); }}>
-                    {slice === 'all' ? 'All' : slice.replace('slice', 'Slice ')}
+                {data.dataset.captures.map((capture) => (
+                  <Button key={capture.id} variant={activeCapture?.id === capture.id ? 'default' : 'outline'} size="sm" onClick={() => {
+                    setSelectedCaptureId(capture.id); setSelectedSlice('all'); setLineFilter('all'); setSelectedSpot(null);
+                    if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
+                    cameraFrame.current = null; pendingCamera.current = null;
+                    setCamera({ x: 0, y: 0, scale: 1 });
+                  }}>{capture.label}</Button>
+                ))}
+              </div>
+            </section>
+          )}
+          {activeCapture && activeCapture.regions.length > 1 && (
+            <section className="mt-3.5 space-y-1.5">
+              <p className="control-label">Tissue region</p>
+              <div className="flex flex-wrap gap-1.5">
+                {[{ id: 'all', label: 'All' }, ...activeCapture.regions].map((region) => (
+                  <Button key={region.id} variant={selectedSlice === region.id ? 'default' : 'outline'} size="sm" className={selectedSlice === region.id ? 'bg-[#9f3d6c] hover:bg-[#9f3d6c]/90' : 'bg-white'} onClick={() => { setSelectedSlice(region.id); setSelectedSpot(null); setCamera({ x: 0, y: 0, scale: 1 }); }}>
+                    {region.label}
                   </Button>
                 ))}
               </div>
@@ -534,11 +575,11 @@ export default function Home() {
           )}
 
           <section className="mt-3.5 space-y-1.5">
-            <p className="control-label">GBO line</p>
+            <p className="control-label">{data.dataset.tissue_type === 'gGBO' ? 'GBO line' : 'Sample'}</p>
             <div className="flex flex-wrap gap-1.5">
               {(data.dataset.lines.length === 1 ? data.dataset.lines : ['all', ...data.dataset.lines]).map((line) => (
                 <Button key={line} variant={lineFilter === line ? 'default' : 'outline'} size="sm" className={lineFilter === line ? 'bg-[#351d4a] hover:bg-[#351d4a]/90' : 'bg-white'} onClick={() => { setLineFilter(line); setSelectedSpot(null); }}>
-                  {line === 'all' ? 'All' : formatGboLine(line)}
+                  {line === 'all' ? 'All' : data.dataset.tissue_type === 'gGBO' ? formatGboLine(line) : line}
                 </Button>
               ))}
             </div>
@@ -553,7 +594,7 @@ export default function Home() {
           <section className="mt-3.5 space-y-1.5">
             <div className="flex items-center justify-between">
               <p className="control-label">Gene</p>
-              <span className="text-[10px] text-[#91877d]">{formatNumber(data.genes.length)} SCT genes</span>
+              <span className="text-[10px] text-[#91877d]">{formatNumber(data.genes.length)} {data.dataset.expression.assay} genes</span>
             </div>
             <label className="flex h-9 items-center gap-2 rounded-lg border border-[#d7d0c5] bg-white px-2.5 focus-within:ring-2 focus-within:ring-[#b7517d]/25">
               <Search className="size-3.5 text-[#8f857c]" />
@@ -607,6 +648,9 @@ export default function Home() {
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
           >
+            {imageStatus !== 'loaded' && <output className="absolute left-4 top-4 z-10 rounded-lg bg-white/95 p-2 text-xs">
+              {imageStatus === 'error' ? <><span>Histology unavailable or image dimensions do not match.</span> <button className="underline" onClick={() => setImageRetry((value) => value + 1)}>Retry image</button></> : 'Loading histology…'}
+            </output>}
             <div ref={spatialViewport} className="w-full max-w-[min(74vh,900px)] shrink-0" style={{ aspectRatio: `${imageWidth} / ${imageHeight}` }}>
               <svg className="size-full overflow-visible" viewBox={spatialViewBox} role="img" aria-label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} shapeRendering="geometricPrecision">
                 {spatialPanel}
@@ -628,7 +672,7 @@ export default function Home() {
 
         <aside className="border-t border-[#d7d0c5] bg-[#fbfaf7] p-3 xl:overflow-y-auto xl:border-l xl:border-t-0">
           <div className="mb-3 rounded-xl border border-[#d7d0c5] bg-white p-3">
-            <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold">Linked UMAP</p><span className="text-[10px] text-[#8a8179]">{isHd ? 'SCT UMAP' : 'Integrated CCA'}</span></div>
+            <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold">Linked UMAP</p><span className="text-[10px] text-[#8a8179]">{data.dataset.embedding_label}</span></div>
             {umapPanel}
           </div>
 
@@ -638,7 +682,7 @@ export default function Home() {
               <div className="rounded-xl border border-[#d7d0c5] bg-white p-3.5 shadow-sm">
                 <p className="truncate font-mono text-[11px] text-[#7a7169]">{selectedSpot.barcode}</p>
                 <div className="mt-3 flex items-center justify-between">
-                  <div><p className="text-lg font-semibold">{selectedSpot.identity}</p><p className="text-xs text-[#756d66]">Line {formatGboLine(selectedSpot.line)} · Cluster {selectedSpot.cluster}</p></div>
+                  <div><p className="text-lg font-semibold">{selectedSpot.identity}</p><p className="text-xs text-[#756d66]">{data.dataset.tissue_type === 'gGBO' ? `Line ${formatGboLine(selectedSpot.line)}` : selectedSpot.line} · Cluster {selectedSpot.cluster}</p></div>
                   <i className="size-5 rounded-full border-2 border-white shadow" style={{ background: getIdentityColor(selectedSpot.identity) }} />
                 </div>
               </div>
@@ -648,7 +692,7 @@ export default function Home() {
                 <Metric label="Mito" value={`${selectedSpot.mito.toFixed(1)}%`} />
                 <Metric label={selectedGene} value={geneLoading ? '…' : (getSelectedExpression(selectedSpot)?.toFixed(2) ?? (geneError ? 'Unavailable' : '…'))} accent />
               </div>
-              {!isHd && <div className="rounded-xl border border-[#d7d0c5] bg-white p-3.5">
+              {selectedSpot.expression && <div className="rounded-xl border border-[#d7d0c5] bg-white p-3.5">
                 <p className="mb-3 text-xs font-semibold">Selected expression</p>
                 <div className="space-y-2.5">
                   {data.genes.slice(0, 6).map((gene) => {
@@ -666,7 +710,8 @@ export default function Home() {
           )}
           <div className="mt-4 rounded-xl border border-[#d7d0c5] bg-[#f1ece5] p-3 text-[11px] leading-4 text-[#6e665f]">
             <div className="mb-1 flex items-center gap-1.5 font-semibold text-[#4d4742]"><ImageIcon className="size-3.5" />Prototype scope</div>
-            {isHd ? `UP-12163 Visium HD with three capture areas on one shared H&E, annotated cell identities and all ${formatNumber(data.genes.length)} SCT genes loaded on demand. Cells are shown by their segmentation centers.` : 'One regular Visium capture area, two retained GBO regions, 12 representative genes and annotations from the integrated Seurat object.'}
+            {data.dataset.description} {formatNumber(data.genes.length)} {data.dataset.expression.assay} genes available.
+
           </div>
         </aside>
       </div>

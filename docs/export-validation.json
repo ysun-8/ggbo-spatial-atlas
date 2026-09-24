@@ -1,0 +1,91 @@
+[
+  {
+    "dataset": "visium-a",
+    "source_object": "FF_Visium_10_2024/GBO_Visium_CCA_Integrated_061726_Full.RDS",
+    "observations": 574,
+    "source_observations": 2383,
+    "intentionally_excluded": 1809,
+    "genes": 12,
+    "geometry": {
+      "slice2": {
+        "capture": "regular-2024-10-a",
+        "count": 266,
+        "scale": 0.29498526,
+        "x_range": [
+          946.236626980506,
+          1418.97493787156
+        ],
+        "y_range": [
+          285.157455589058,
+          984.442218638496
+        ]
+      },
+      "slice8": {
+        "capture": "regular-2024-10-a",
+        "count": 308,
+        "scale": 0.29498526,
+        "x_range": [
+          352.316576832192,
+          869.890127266856
+        ],
+        "y_range": [
+          294.015483761081,
+          1109.02940569722
+        ]
+      }
+    },
+    "encoding": "uint32-float32-v2",
+    "max_expression_roundtrip_error": 2.35925713631957e-07
+  },
+  {
+    "dataset": "hd-12163",
+    "source_object": "FF_Visium_HD_10_2025/Objects/visium_hd_12163_CAR_T_Annotated_082026.RDS",
+    "observations": 17039,
+    "source_observations": 17039,
+    "intentionally_excluded": 0,
+    "genes": 15533,
+    "geometry": {
+      "slice2": {
+        "capture": "hd-2025-c",
+        "count": 4924,
+        "scale": 0.31512606,
+        "x_range": [
+          3818.18453678062,
+          5187.62000268206
+        ],
+        "y_range": [
+          1209.48933592632,
+          2381.61223032246
+        ]
+      },
+      "slice4": {
+        "capture": "hd-2025-c",
+        "count": 6016,
+        "scale": 0.31512606,
+        "x_range": [
+          2859.94628768861,
+          4187.3082088774
+        ],
+        "y_range": [
+          2638.98680606012,
+          3636.81010845318
+        ]
+      },
+      "slice6": {
+        "capture": "hd-2025-c",
+        "count": 6099,
+        "scale": 0.31512606,
+        "x_range": [
+          3038.31453897768,
+          4661.08580329762
+        ],
+        "y_range": [
+          4121.99028081838,
+          4769.52940443575
+        ]
+      }
+    },
+    "encoding": "uint32-float32-v2",
+    "max_expression_roundtrip_error": 2.21185206150665e-07
+  }
+]

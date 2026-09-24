@@ -1,0 +1,68 @@
+{
+  "dataset": "visium-a",
+  "source_object": "FF_Visium_10_2024/GBO_Visium_CCA_Integrated_061726_Full.RDS",
+  "observations": 2383,
+  "source_observations": 2383,
+  "intentionally_excluded": 0,
+  "genes": 19779,
+  "geometry": {
+    "slice2": {
+      "capture": "regular-2024-10-a",
+      "count": 266,
+      "scale": 0.29498526,
+      "x_range": [946.236626980506, 1418.97493787156],
+      "y_range": [285.157455589058, 984.442218638496]
+    },
+    "slice8": {
+      "capture": "regular-2024-10-a",
+      "count": 308,
+      "scale": 0.29498526,
+      "x_range": [352.316576832192, 869.890127266856],
+      "y_range": [294.015483761081, 1109.02940569722]
+    },
+    "slice3": {
+      "capture": "regular-2024-10-b",
+      "count": 231,
+      "scale": 0.29498526,
+      "x_range": [1322.64571520893, 1791.88635297894],
+      "y_range": [599.130305816239, 977.228807688374]
+    },
+    "slice5": {
+      "capture": "regular-2024-10-b",
+      "count": 214,
+      "scale": 0.29498526,
+      "x_range": [746.911939819667, 1237.68873019147],
+      "y_range": [612.660264096841, 934.477567069409]
+    },
+    "slice1": {
+      "capture": "regular-2024-10-ffpe-10072-9059",
+      "count": 463,
+      "scale": 1,
+      "x_range": [513.188593222386, 1222.02824466684],
+      "y_range": [755.052995736681, 1332.42087569583]
+    },
+    "slice6": {
+      "capture": "regular-2024-10-ffpe-10072-9059",
+      "count": 166,
+      "scale": 1,
+      "x_range": [1996.05217960604, 2243.46746182566],
+      "y_range": [1596.02891347325, 2191.64483825116]
+    },
+    "slice4": {
+      "capture": "regular-2024-10-ffpe-9121-7790",
+      "count": 661,
+      "scale": 1,
+      "x_range": [784.9693, 1489.4244],
+      "y_range": [1305.5409, 1914.1204]
+    },
+    "slice7": {
+      "capture": "regular-2024-10-ffpe-9121-7790",
+      "count": 74,
+      "scale": 1,
+      "x_range": [1786.7269, 1958.3351],
+      "y_range": [1415.212, 1600.6285]
+    }
+  },
+  "encoding": "uint32-float32-v2",
+  "max_expression_roundtrip_error": 2.38206992797529e-07
+}

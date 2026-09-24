@@ -1,0 +1,47 @@
+{
+  "dataset": "visium-dec-radiation",
+  "source_object": "FF_Visium_12_2024/GBO_Rad_Visium_Round_2_122825.RDS",
+  "observations": 795,
+  "source_observations": 795,
+  "intentionally_excluded": 0,
+  "genes": 16028,
+  "geometry": {
+    "slice12": {
+      "capture": "regular-2024-12-c",
+      "count": 216,
+      "scale": 0.39154267,
+      "x_range": [448.259768212652, 762.389324816009],
+      "y_range": [433.608887989783, 787.991877001273]
+    },
+    "slice13": {
+      "capture": "regular-2024-12-c",
+      "count": 182,
+      "scale": 0.39154267,
+      "x_range": [492.945763783088, 826.303165078369],
+      "y_range": [877.648981273673, 1151.85007648367]
+    },
+    "slice14": {
+      "capture": "regular-2024-12-c",
+      "count": 161,
+      "scale": 0.39154267,
+      "x_range": [321.247708872834, 692.648423389298],
+      "y_range": [1291.55694995917, 1526.94792933035]
+    },
+    "slice15": {
+      "capture": "regular-2024-12-c",
+      "count": 97,
+      "scale": 0.39154267,
+      "x_range": [994.465125406771, 1228.23557498115],
+      "y_range": [513.175581651651, 737.058925178802]
+    },
+    "slice16": {
+      "capture": "regular-2024-12-c",
+      "count": 139,
+      "scale": 0.39154267,
+      "x_range": [1135.92459757359, 1390.83845662495],
+      "y_range": [849.274741816322, 1106.0300464659]
+    }
+  },
+  "encoding": "uint32-float32-v2",
+  "max_expression_roundtrip_error": 2.38206992797529e-07
+}

@@ -1,0 +1,383 @@
+{
+  "schema_version": 2,
+  "default_dataset": "hd-12163",
+  "datasets": [
+    {
+      "id": "visium-a",
+      "label": "Visium \u00b7 late-passage \u00b7 baseline",
+      "path": "/data/visium-a.json",
+      "name": "Late-passage baseline",
+      "cohort": "Visium October 2024 \u00b7 fresh-frozen and FFPE",
+      "kind": "regular",
+      "preparation": "mixed",
+      "study_group": "baseline",
+      "tissue_type": "gGBO",
+      "observation_label": "spot",
+      "annotation_field": "ident",
+      "embedding": "umap.cca",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "Four physical captures with eight retained late-passage baseline GBO regions. Fresh-frozen and FFPE captures are shown separately.",
+      "captures": [
+        {
+          "id": "regular-2024-10-a",
+          "label": "Fresh-frozen A",
+          "preparation": "fresh-frozen",
+          "image": "/visium-a-histology.png",
+          "width": 2000,
+          "height": 2000,
+          "marker_radius": 7.633544660319969,
+          "regions": [
+            {
+              "id": "slice2",
+              "label": "Region 2"
+            },
+            {
+              "id": "slice8",
+              "label": "Region 8"
+            }
+          ]
+        },
+        {
+          "id": "regular-2024-10-b",
+          "label": "Fresh-frozen B",
+          "preparation": "fresh-frozen",
+          "image": "/visium-late-b-histology.png",
+          "width": 2000,
+          "height": 2000,
+          "marker_radius": 7.633201161326085,
+          "regions": [
+            {
+              "id": "slice3",
+              "label": "Region 3"
+            },
+            {
+              "id": "slice5",
+              "label": "Region 5"
+            }
+          ]
+        },
+        {
+          "id": "regular-2024-10-ffpe-10072-9059",
+          "label": "FFPE \u00b7 UP-10072 / UP-9059",
+          "preparation": "FFPE",
+          "image": "/visium-late-ffpe-10072-9059-histology.png",
+          "width": 3000,
+          "height": 3000,
+          "marker_radius": 6.450511453001312,
+          "regions": [
+            {
+              "id": "slice1",
+              "label": "Region 1"
+            },
+            {
+              "id": "slice6",
+              "label": "Region 6"
+            }
+          ]
+        },
+        {
+          "id": "regular-2024-10-ffpe-9121-7790",
+          "label": "FFPE \u00b7 UP-9121 / UP-7790",
+          "preparation": "FFPE",
+          "image": "/visium-late-ffpe-9121-7790-histology.png",
+          "width": 3000,
+          "height": 3000,
+          "marker_radius": 6.3936345,
+          "regions": [
+            {
+              "id": "slice4",
+              "label": "Region 4"
+            },
+            {
+              "id": "slice7",
+              "label": "Region 7"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "Integrated CCA"
+    },
+    {
+      "id": "visium-dec-baseline",
+      "label": "Visium \u00b7 early-passage \u00b7 baseline",
+      "path": "/data/visium-dec-baseline.json",
+      "name": "Early-passage baseline \u00b7 UP-11556 / UP-11662",
+      "cohort": "FF Visium December 2024",
+      "kind": "regular",
+      "preparation": "fresh-frozen",
+      "study_group": "baseline",
+      "tissue_type": "gGBO",
+      "observation_label": "spot",
+      "annotation_field": "ident",
+      "embedding": "umap.cca",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "One capture area with five retained baseline GBO regions from UP-11556 and UP-11662.",
+      "captures": [
+        {
+          "id": "regular-2024-12-a",
+          "label": "Capture A",
+          "image": "/visium-dec-baseline-histology.png",
+          "width": 2000,
+          "height": 1929,
+          "marker_radius": 7.279459026980377,
+          "regions": [
+            {
+              "id": "slice1",
+              "label": "Region 1"
+            },
+            {
+              "id": "slice2",
+              "label": "Region 2"
+            },
+            {
+              "id": "slice3",
+              "label": "Region 3"
+            },
+            {
+              "id": "slice4",
+              "label": "Region 4"
+            },
+            {
+              "id": "slice5",
+              "label": "Region 5"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "Integrated CCA"
+    },
+    {
+      "id": "visium-dec-cart",
+      "label": "Visium \u00b7 early-passage \u00b7 CAR-T",
+      "path": "/data/visium-dec-cart.json",
+      "name": "Early-passage CAR-T \u00b7 UP-11556 / UP-11662",
+      "cohort": "FF Visium December 2024",
+      "kind": "regular",
+      "preparation": "fresh-frozen",
+      "study_group": "CAR-T",
+      "tissue_type": "gGBO",
+      "observation_label": "spot",
+      "annotation_field": "identity",
+      "embedding": "umap.cca",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "One capture area with 6 retained CAR-T GBO regions from UP-11556 and UP-11662.",
+      "captures": [
+        {
+          "id": "regular-2024-12-b",
+          "label": "Capture B",
+          "image": "/visium-dec-cart-histology.png",
+          "width": 2000,
+          "height": 1929,
+          "marker_radius": 7.2792119217055555,
+          "regions": [
+            {
+              "id": "slice6",
+              "label": "Region 6"
+            },
+            {
+              "id": "slice7",
+              "label": "Region 7"
+            },
+            {
+              "id": "slice8",
+              "label": "Region 8"
+            },
+            {
+              "id": "slice9",
+              "label": "Region 9"
+            },
+            {
+              "id": "slice10",
+              "label": "Region 10"
+            },
+            {
+              "id": "slice11",
+              "label": "Region 11"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "Integrated CCA"
+    },
+    {
+      "id": "visium-dec-radiation",
+      "label": "Visium \u00b7 early-passage \u00b7 radiation",
+      "path": "/data/visium-dec-radiation.json",
+      "name": "Early-passage radiation \u00b7 UP-11556 / UP-11662",
+      "cohort": "FF Visium December 2024",
+      "kind": "regular",
+      "preparation": "fresh-frozen",
+      "study_group": "radiation",
+      "tissue_type": "gGBO",
+      "observation_label": "spot",
+      "annotation_field": "ident",
+      "embedding": "umap.cca",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "One capture area with 5 retained radiation GBO regions from UP-11556 and UP-11662.",
+      "captures": [
+        {
+          "id": "regular-2024-12-c",
+          "label": "Capture C",
+          "image": "/visium-dec-radiation-histology.png",
+          "width": 2000,
+          "height": 1929,
+          "marker_radius": 7.279247044504673,
+          "regions": [
+            {
+              "id": "slice12",
+              "label": "Region 12"
+            },
+            {
+              "id": "slice13",
+              "label": "Region 13"
+            },
+            {
+              "id": "slice14",
+              "label": "Region 14"
+            },
+            {
+              "id": "slice15",
+              "label": "Region 15"
+            },
+            {
+              "id": "slice16",
+              "label": "Region 16"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "Integrated CCA"
+    },
+    {
+      "id": "hd-12163",
+      "label": "Visium HD \u00b7 UP-12163 \u00b7 CAR-T",
+      "path": "/data/hd-12163.json",
+      "name": "UP-12163 CAR-T",
+      "cohort": "FF Visium HD October 2025",
+      "kind": "hd",
+      "preparation": "fresh-frozen",
+      "study_group": "CAR-T",
+      "tissue_type": "gGBO",
+      "observation_label": "cell",
+      "annotation_field": "identity",
+      "embedding": "umap",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "One capture area with three retained GBO regions. Cells are shown by their segmentation centers.",
+      "captures": [
+        {
+          "id": "hd-2025-c",
+          "label": "Capture C",
+          "image": "/hd-12163.png",
+          "width": 6000,
+          "height": 5984,
+          "marker_radius": 9,
+          "regions": [
+            {
+              "id": "slice2",
+              "label": "Region 2"
+            },
+            {
+              "id": "slice4",
+              "label": "Region 4"
+            },
+            {
+              "id": "slice6",
+              "label": "Region 6"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "SCT UMAP"
+    }
+  ]
+}

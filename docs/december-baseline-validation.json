@@ -1,0 +1,47 @@
+{
+  "dataset": "visium-dec-baseline",
+  "source_object": "FF_Visium_12_2024/GBO_Baseline_Visium_Round_2_071326.RDS",
+  "observations": 908,
+  "source_observations": 908,
+  "intentionally_excluded": 0,
+  "genes": 15435,
+  "geometry": {
+    "slice1": {
+      "capture": "regular-2024-12-a",
+      "count": 238,
+      "scale": 0.39154267,
+      "x_range": [785.9509282503, 1136.96325651582],
+      "y_range": [324.888415078634, 681.02025178019]
+    },
+    "slice2": {
+      "capture": "regular-2024-12-a",
+      "count": 212,
+      "scale": 0.39154267,
+      "x_range": [1105.71111253678, 1477.96707550305],
+      "y_range": [1238.95200450605, 1536.03440783579]
+    },
+    "slice3": {
+      "capture": "regular-2024-12-a",
+      "count": 146,
+      "scale": 0.39154267,
+      "x_range": [396.060776128488, 670.740573811319],
+      "y_range": [427.178219241065, 697.146767716082]
+    },
+    "slice4": {
+      "capture": "regular-2024-12-a",
+      "count": 179,
+      "scale": 0.39154267,
+      "x_range": [498.919496252779, 792.133087195925],
+      "y_range": [809.191228878479, 1101.41588028474]
+    },
+    "slice5": {
+      "capture": "regular-2024-12-a",
+      "count": 133,
+      "scale": 0.39154267,
+      "x_range": [442.484319105547, 755.464385227878],
+      "y_range": [1222.77935041269, 1434.52288820655]
+    }
+  },
+  "encoding": "uint32-float32-v2",
+  "max_expression_roundtrip_error": 2.35925713631957e-07
+}

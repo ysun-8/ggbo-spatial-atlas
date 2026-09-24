@@ -1,0 +1,89 @@
+{
+  "visium-a": {
+    "source": "FF_Visium_10_2024/GBO_Visium_CCA_Integrated_061726_Full.RDS",
+    "line_field": "line",
+    "identity_field": "ident",
+    "cluster_field": "cca_clusters",
+    "count_field": "nCount_Spatial",
+    "feature_field": "nFeature_Spatial",
+    "mito_field": "perc.mito",
+    "captures": {
+      "regular-2024-10-a": {
+        "image": "FF_Visium_10_2024/Visium_A/outs/spatial/tissue_hires_image.png",
+        "scale": "hires"
+      },
+      "regular-2024-10-b": {
+        "image": "FF_Visium_10_2024/Visium_B/outs/spatial/tissue_hires_image.png",
+        "scale": "hires"
+      },
+      "regular-2024-10-ffpe-10072-9059": {
+        "image": "Visium_FFPE/10072_9059/outs/spatial/tissue_hires_image.png",
+        "scale": "hires"
+      },
+      "regular-2024-10-ffpe-9121-7790": {
+        "image": "Visium_FFPE/9121_7790/outs/spatial/tissue_hires_image.png",
+        "scale": "hires"
+      }
+    }
+  },
+  "hd-12163": {
+    "source": "FF_Visium_HD_10_2025/Objects/visium_hd_12163_CAR_T_Annotated_082026.RDS",
+    "line_field": "line",
+    "identity_field": "identity",
+    "cluster_field": "seurat_clusters",
+    "count_field": "nCount_Spatial.Polygons",
+    "feature_field": "nFeature_Spatial.Polygons",
+    "mito_field": "perc.mito",
+    "captures": {
+      "hd-2025-c": {
+        "image": "FF_Visium_HD_10_2025/C_CAR_T/outs/spatial/tissue_hires_image.png",
+        "scale": "hires"
+      }
+    }
+  },
+  "visium-dec-baseline": {
+    "source": "FF_Visium_12_2024/GBO_Baseline_Visium_Round_2_071326.RDS",
+    "line_field": "line",
+    "identity_field": "ident",
+    "cluster_field": "cca_clusters",
+    "count_field": "nCount_Spatial",
+    "feature_field": "nFeature_Spatial",
+    "mito_field": "perc.mito",
+    "captures": {
+      "regular-2024-12-a": {
+        "image": "FF_Visium_12_2024/Visium_A/outs/spatial/tissue_hires_image.png",
+        "scale": "hires"
+      }
+    }
+  },
+  "visium-dec-cart": {
+    "source": "FF_Visium_12_2024/GBO_CART_Visium_Round_2_081926.RDS",
+    "line_field": "line",
+    "identity_field": "identity",
+    "cluster_field": "cca_clusters",
+    "count_field": "nCount_Spatial",
+    "feature_field": "nFeature_Spatial",
+    "mito_field": "perc.mito",
+    "captures": {
+      "regular-2024-12-b": {
+        "image": "FF_Visium_12_2024/Visium_B/outs/spatial/tissue_hires_image.png",
+        "scale": "hires"
+      }
+    }
+  },
+  "visium-dec-radiation": {
+    "source": "FF_Visium_12_2024/GBO_Rad_Visium_Round_2_122825.RDS",
+    "line_field": "line",
+    "identity_field": "ident",
+    "cluster_field": "cca_clusters",
+    "count_field": "nCount_Spatial",
+    "feature_field": "nFeature_Spatial",
+    "mito_field": "perc.mito",
+    "captures": {
+      "regular-2024-12-c": {
+        "image": "FF_Visium_12_2024/Visium_C/outs/spatial/tissue_hires_image.png",
+        "scale": "hires"
+      }
+    }
+  }
+}

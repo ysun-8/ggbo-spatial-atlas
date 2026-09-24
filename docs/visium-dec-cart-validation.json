@@ -1,0 +1,54 @@
+{
+  "dataset": "visium-dec-cart",
+  "source_object": "FF_Visium_12_2024/GBO_CART_Visium_Round_2_081926.RDS",
+  "observations": 566,
+  "source_observations": 566,
+  "intentionally_excluded": 0,
+  "genes": 11391,
+  "geometry": {
+    "slice6": {
+      "capture": "regular-2024-12-b",
+      "count": 32,
+      "scale": 0.39154267,
+      "x_range": [1027.75022811103, 1435.98559688975],
+      "y_range": [261.429546982524, 549.343441228154]
+    },
+    "slice7": {
+      "capture": "regular-2024-12-b",
+      "count": 59,
+      "scale": 0.39154267,
+      "x_range": [1340.97068789772, 1574.56658936551],
+      "y_range": [632.07014867901, 809.539704476901]
+    },
+    "slice8": {
+      "capture": "regular-2024-12-b",
+      "count": 272,
+      "scale": 0.39154267,
+      "x_range": [1093.57226436936, 1582.82643980084],
+      "y_range": [1117.5631151767, 1562.78316076446]
+    },
+    "slice9": {
+      "capture": "regular-2024-12-b",
+      "count": 70,
+      "scale": 0.39154267,
+      "x_range": [262.091174187545, 692.058155943005],
+      "y_range": [260.471428734715, 428.992509657616]
+    },
+    "slice10": {
+      "capture": "regular-2024-12-b",
+      "count": 67,
+      "scale": 0.39154267,
+      "x_range": [463.75483718313, 642.491191419936],
+      "y_range": [702.92997545574, 892.408402040772]
+    },
+    "slice11": {
+      "capture": "regular-2024-12-b",
+      "count": 66,
+      "scale": 0.39154267,
+      "x_range": [417.865736554804, 590.990937146521],
+      "y_range": [1426.49797243155, 1622.10456855031]
+    }
+  },
+  "encoding": "uint32-float32-v2",
+  "max_expression_roundtrip_error": 1.91725144205179e-07
+}
