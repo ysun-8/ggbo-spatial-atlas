@@ -37,44 +37,6 @@
       "description": "Four physical captures with eight retained late-passage baseline GBO regions. Fresh-frozen and FFPE captures are shown separately.",
       "captures": [
         {
-          "id": "regular-2024-10-a",
-          "label": "Fresh-frozen A",
-          "preparation": "fresh-frozen",
-          "image": "/visium-a-histology.png",
-          "width": 2000,
-          "height": 2000,
-          "marker_radius": 7.633544660319969,
-          "regions": [
-            {
-              "id": "slice2",
-              "label": "Region 2"
-            },
-            {
-              "id": "slice8",
-              "label": "Region 8"
-            }
-          ]
-        },
-        {
-          "id": "regular-2024-10-b",
-          "label": "Fresh-frozen B",
-          "preparation": "fresh-frozen",
-          "image": "/visium-late-b-histology.png",
-          "width": 2000,
-          "height": 2000,
-          "marker_radius": 7.633201161326085,
-          "regions": [
-            {
-              "id": "slice3",
-              "label": "Region 3"
-            },
-            {
-              "id": "slice5",
-              "label": "Region 5"
-            }
-          ]
-        },
-        {
           "id": "regular-2024-10-ffpe-10072-9059",
           "label": "FFPE \u00b7 UP-10072 / UP-9059",
           "preparation": "FFPE",
@@ -109,6 +71,44 @@
             {
               "id": "slice7",
               "label": "Region 7"
+            }
+          ]
+        },
+        {
+          "id": "regular-2024-10-a",
+          "label": "Fresh-frozen A",
+          "preparation": "fresh-frozen",
+          "image": "/visium-a-histology.png",
+          "width": 2000,
+          "height": 2000,
+          "marker_radius": 7.633544660319969,
+          "regions": [
+            {
+              "id": "slice2",
+              "label": "Region 2"
+            },
+            {
+              "id": "slice8",
+              "label": "Region 8"
+            }
+          ]
+        },
+        {
+          "id": "regular-2024-10-b",
+          "label": "Fresh-frozen B",
+          "preparation": "fresh-frozen",
+          "image": "/visium-late-b-histology.png",
+          "width": 2000,
+          "height": 2000,
+          "marker_radius": 7.633201161326085,
+          "regions": [
+            {
+              "id": "slice3",
+              "label": "Region 3"
+            },
+            {
+              "id": "slice5",
+              "label": "Region 5"
             }
           ]
         }
