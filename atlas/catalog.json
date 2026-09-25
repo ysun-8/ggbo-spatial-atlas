@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "default_dataset": "hd-12163",
+  "default_dataset": "hd-11789-baseline",
   "datasets": [
     {
       "id": "visium-a",
