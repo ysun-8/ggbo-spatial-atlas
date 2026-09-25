@@ -79,3 +79,7 @@ Release checks passed: all four late-passage overlays, capture counts, Region 7 
 ## Fresh-frozen HD expansion
 
 The full baseline, CAR-T, and hypoxia HD series is documented in [HD-DATASETS.md](HD-DATASETS.md). New expression chunks have a `.bin.gz` suffix and are losslessly decompressed before interpreting offsets; older `.bin` chunks remain supported.
+
+## Navigation
+
+The dataset dropdown groups entries by Visium and Visium HD. HD baseline, CAR-T, and hypoxia each appear once, with a separate GBO line selector. Catalog navigation fields map these choices to the original per-object exports. Switching condition retains the current line when available; otherwise it selects the first available line. Capture, line, and tissue region choices precede display controls. Late-passage captures retain their FFPE-first order.

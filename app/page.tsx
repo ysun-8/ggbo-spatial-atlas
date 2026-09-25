@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { NativeSelect } from '@/components/ui/native-select';
 import catalog from '@/atlas/catalog.json';
 import { decodeExpression, validateSpatialData, filterCaptureSpots } from '@/lib/atlas-format.mjs';
 
@@ -104,6 +105,9 @@ function publicPath(path: string) {
 }
 
 const datasetOptions = catalog.datasets;
+const datasetGroups = [...new Map(datasetOptions.map((entry) => [entry.navigation.group, {
+  id: entry.navigation.group, label: entry.navigation.label,
+}])).values()];
 if (catalog.schema_version !== 2 || !datasetOptions.length || new Set(datasetOptions.map((entry) => entry.id)).size !== datasetOptions.length || !datasetOptions.some((entry) => entry.id === catalog.default_dataset)) {
   throw new Error('Invalid dataset catalog');
 }
@@ -158,6 +162,13 @@ function formatGboLine(value: string) {
 export default function Home() {
   const [data, setData] = useState<VisiumData | null>(null);
   const [datasetId, setDatasetId] = useState(catalog.default_dataset);
+  const selectedEntry = datasetOptions.find((entry) => entry.id === datasetId)!;
+  const groupEntries = datasetOptions.filter((entry) => entry.navigation.group === selectedEntry.navigation.group);
+  const selectGroup = (group: string) => {
+    const entries = datasetOptions.filter((entry) => entry.navigation.group === group);
+    const next = entries.find((entry) => entry.navigation.line === selectedEntry.navigation.line) ?? entries[0];
+    if (next) setDatasetId(next.id);
+  };
   const [selectedCaptureId, setSelectedCaptureId] = useState('');
   const activeCapture = data?.dataset.captures.find((capture) => capture.id === selectedCaptureId) ?? data?.dataset.captures[0];
   const [selectedSlice, setSelectedSlice] = useState('all');
@@ -518,39 +529,48 @@ export default function Home() {
           </div>
 
           <section className="space-y-1.5">
-            <p className="control-label">Dataset</p>
-            <div className="grid gap-1.5">
-              {datasetOptions.map((dataset) => (
-                <Button key={dataset.id} variant={datasetId === dataset.id ? 'default' : 'outline'} size="sm" className={datasetId === dataset.id ? 'h-auto justify-start whitespace-normal py-2 text-left bg-[#351d4a] hover:bg-[#351d4a]/90' : 'h-auto justify-start whitespace-normal py-2 text-left bg-white'} onClick={() => setDatasetId(dataset.id)}>
-                  {dataset.label}
-                </Button>
-              ))}
-            </div>
+            <label className="control-label" htmlFor="dataset-group">Dataset</label>
+            <NativeSelect id="dataset-group" className="w-full bg-white" value={selectedEntry.navigation.group} onChange={(event) => selectGroup(event.target.value)}>
+              <optgroup label="Visium">
+                {datasetGroups.filter((group) => !group.id.startsWith('hd-')).map((group) => <option key={group.id} value={group.id}>{group.label.replace('Visium · ', '')}</option>)}
+              </optgroup>
+              <optgroup label="Visium HD">
+                {datasetGroups.filter((group) => group.id.startsWith('hd-')).map((group) => <option key={group.id} value={group.id}>{group.label}</option>)}
+              </optgroup>
+            </NativeSelect>
           </section>
 
-          <section className="mt-3.5 space-y-1.5">
-            <p className="control-label">Color {observationPlural} by</p>
-            <div className="grid grid-cols-2 rounded-xl bg-[#ede8e0] p-1">
-              <Button variant="ghost" size="sm" className={displayMode === 'gene' ? 'bg-white text-[#57234a] shadow-sm hover:bg-white' : 'text-[#776f67]'} onClick={() => setDisplayMode('gene')}>Gene</Button>
-              <Button variant="ghost" size="sm" className={displayMode === 'identity' ? 'bg-white text-[#57234a] shadow-sm hover:bg-white' : 'text-[#776f67]'} onClick={() => setDisplayMode('identity')}>Identity</Button>
-            </div>
-          </section>
+          {isHd && <section className="mt-3.5 space-y-1.5">
+            <label className="control-label" htmlFor="hd-line">GBO line</label>
+            <NativeSelect id="hd-line" className="w-full bg-white" value={datasetId} onChange={(event) => setDatasetId(event.target.value)}>
+              {groupEntries.map((entry) => <option key={entry.id} value={entry.id}>{entry.navigation.line}</option>)}
+            </NativeSelect>
+          </section>}
 
           {data.dataset.captures.length > 1 && (
             <section className="mt-3.5 space-y-1.5">
-              <p className="control-label">Capture area</p>
-              <div className="flex flex-wrap gap-1.5">
-                {data.dataset.captures.map((capture) => (
-                  <Button key={capture.id} variant={activeCapture?.id === capture.id ? 'default' : 'outline'} size="sm" onClick={() => {
-                    setSelectedCaptureId(capture.id); setSelectedSlice('all'); setLineFilter('all'); setSelectedSpot(null);
-                    if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
-                    cameraFrame.current = null; pendingCamera.current = null;
-                    setCamera({ x: 0, y: 0, scale: 1 });
-                  }}>{capture.label}</Button>
-                ))}
-              </div>
+              <label className="control-label" htmlFor="capture-area">Capture area</label>
+              <NativeSelect id="capture-area" className="w-full bg-white" value={activeCapture?.id} onChange={(event) => {
+                setSelectedCaptureId(event.target.value); setSelectedSlice('all'); setLineFilter('all'); setSelectedSpot(null);
+                if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
+                cameraFrame.current = null; pendingCamera.current = null;
+                setCamera({ x: 0, y: 0, scale: 1 });
+              }}>
+                {data.dataset.captures.map((capture) => <option key={capture.id} value={capture.id}>{capture.label.replaceAll('UP-', '')}</option>)}
+              </NativeSelect>
             </section>
           )}
+          {!isHd && <section className="mt-3.5 space-y-1.5">
+            <p className="control-label">{data.dataset.tissue_type === 'gGBO' ? 'GBO line' : 'Sample'}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {(data.dataset.lines.length === 1 ? data.dataset.lines : ['all', ...data.dataset.lines]).map((line) => (
+                <Button key={line} variant={lineFilter === line ? 'default' : 'outline'} size="sm" className={lineFilter === line ? 'bg-[#351d4a] hover:bg-[#351d4a]/90' : 'bg-white'} onClick={() => { setLineFilter(line); setSelectedSpot(null); }}>
+                  {line === 'all' ? 'All' : data.dataset.tissue_type === 'gGBO' ? formatGboLine(line) : line}
+                </Button>
+              ))}
+            </div>
+          </section>}
+
           {activeCapture && activeCapture.regions.length > 1 && (
             <section className="mt-3.5 space-y-1.5">
               <p className="control-label">Tissue region</p>
@@ -563,6 +583,14 @@ export default function Home() {
               </div>
             </section>
           )}
+
+          <section className="mt-3.5 space-y-1.5">
+            <p className="control-label">Color {observationPlural} by</p>
+            <div className="grid grid-cols-2 rounded-xl bg-[#ede8e0] p-1">
+              <Button variant="ghost" size="sm" className={displayMode === 'gene' ? 'bg-white text-[#57234a] shadow-sm hover:bg-white' : 'text-[#776f67]'} onClick={() => setDisplayMode('gene')}>Gene</Button>
+              <Button variant="ghost" size="sm" className={displayMode === 'identity' ? 'bg-white text-[#57234a] shadow-sm hover:bg-white' : 'text-[#776f67]'} onClick={() => setDisplayMode('identity')}>Identity</Button>
+            </div>
+          </section>
 
           {displayMode === 'gene' && (
             <section className="mt-3.5 space-y-1.5">
@@ -577,17 +605,6 @@ export default function Home() {
               </div>
             </section>
           )}
-
-          <section className="mt-3.5 space-y-1.5">
-            <p className="control-label">{data.dataset.tissue_type === 'gGBO' ? 'GBO line' : 'Sample'}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {(data.dataset.lines.length === 1 ? data.dataset.lines : ['all', ...data.dataset.lines]).map((line) => (
-                <Button key={line} variant={lineFilter === line ? 'default' : 'outline'} size="sm" className={lineFilter === line ? 'bg-[#351d4a] hover:bg-[#351d4a]/90' : 'bg-white'} onClick={() => { setLineFilter(line); setSelectedSpot(null); }}>
-                  {line === 'all' ? 'All' : data.dataset.tissue_type === 'gGBO' ? formatGboLine(line) : line}
-                </Button>
-              ))}
-            </div>
-          </section>
 
           {isHd && <section className="mt-3.5 space-y-1.5">
             <label className="flex items-center justify-between text-xs" htmlFor="hd-dot-size"><span className="control-label">Cell dot size</span><span>{hdDotSize}%</span></label>

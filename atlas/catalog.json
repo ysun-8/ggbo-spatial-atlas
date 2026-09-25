@@ -113,7 +113,12 @@
           ]
         }
       ],
-      "embedding_label": "Integrated CCA"
+      "embedding_label": "Integrated CCA",
+      "navigation": {
+        "group": "visium-a",
+        "label": "Visium \u00b7 late-passage \u00b7 baseline",
+        "line": ""
+      }
     },
     {
       "id": "visium-dec-baseline",
@@ -180,7 +185,12 @@
           ]
         }
       ],
-      "embedding_label": "Integrated CCA"
+      "embedding_label": "Integrated CCA",
+      "navigation": {
+        "group": "visium-dec-baseline",
+        "label": "Visium \u00b7 early-passage \u00b7 baseline",
+        "line": ""
+      }
     },
     {
       "id": "visium-dec-cart",
@@ -251,7 +261,12 @@
           ]
         }
       ],
-      "embedding_label": "Integrated CCA"
+      "embedding_label": "Integrated CCA",
+      "navigation": {
+        "group": "visium-dec-cart",
+        "label": "Visium \u00b7 early-passage \u00b7 CAR-T",
+        "line": ""
+      }
     },
     {
       "id": "visium-dec-radiation",
@@ -318,7 +333,12 @@
           ]
         }
       ],
-      "embedding_label": "Integrated CCA"
+      "embedding_label": "Integrated CCA",
+      "navigation": {
+        "group": "visium-dec-radiation",
+        "label": "Visium \u00b7 early-passage \u00b7 radiation",
+        "line": ""
+      }
     },
     {
       "id": "hd-11972-baseline",
@@ -381,7 +401,12 @@
           ]
         }
       ],
-      "embedding_label": "SCT UMAP"
+      "embedding_label": "SCT UMAP",
+      "navigation": {
+        "group": "hd-baseline",
+        "label": "Visium HD \u00b7 baseline",
+        "line": "UP-11972"
+      }
     },
     {
       "id": "hd-11789-baseline",
@@ -444,7 +469,12 @@
           ]
         }
       ],
-      "embedding_label": "SCT UMAP"
+      "embedding_label": "SCT UMAP",
+      "navigation": {
+        "group": "hd-baseline",
+        "label": "Visium HD \u00b7 baseline",
+        "line": "UP-11789"
+      }
     },
     {
       "id": "hd-12131-baseline",
@@ -503,7 +533,12 @@
           ]
         }
       ],
-      "embedding_label": "SCT UMAP"
+      "embedding_label": "SCT UMAP",
+      "navigation": {
+        "group": "hd-baseline",
+        "label": "Visium HD \u00b7 baseline",
+        "line": "UP-12131"
+      }
     },
     {
       "id": "hd-12163-baseline",
@@ -566,7 +601,12 @@
           ]
         }
       ],
-      "embedding_label": "SCT UMAP"
+      "embedding_label": "SCT UMAP",
+      "navigation": {
+        "group": "hd-baseline",
+        "label": "Visium HD \u00b7 baseline",
+        "line": "UP-12163"
+      }
     },
     {
       "id": "hd-12131-car-t",
@@ -625,7 +665,12 @@
           ]
         }
       ],
-      "embedding_label": "SCT UMAP"
+      "embedding_label": "SCT UMAP",
+      "navigation": {
+        "group": "hd-car-t",
+        "label": "Visium HD \u00b7 CAR-T",
+        "line": "UP-12131"
+      }
     },
     {
       "id": "hd-12163",
@@ -684,7 +729,12 @@
           ]
         }
       ],
-      "embedding_label": "SCT UMAP"
+      "embedding_label": "SCT UMAP",
+      "navigation": {
+        "group": "hd-car-t",
+        "label": "Visium HD \u00b7 CAR-T",
+        "line": "UP-12163"
+      }
     },
     {
       "id": "hd-11789-hypoxia",
@@ -743,7 +793,12 @@
           ]
         }
       ],
-      "embedding_label": "SCT UMAP"
+      "embedding_label": "SCT UMAP",
+      "navigation": {
+        "group": "hd-hypoxia",
+        "label": "Visium HD \u00b7 hypoxia",
+        "line": "UP-11789"
+      }
     },
     {
       "id": "hd-12163-hypoxia",
@@ -806,7 +861,12 @@
           ]
         }
       ],
-      "embedding_label": "SCT UMAP"
+      "embedding_label": "SCT UMAP",
+      "navigation": {
+        "group": "hd-hypoxia",
+        "label": "Visium HD \u00b7 hypoxia",
+        "line": "UP-12163"
+      }
     }
   ]
 }
