@@ -75,3 +75,7 @@ Test the 131,504-cell primary sample separately before claiming browser performa
 The full October integrated object now includes all 2,383 spots and all 19,779 SCT/data genes. Fresh-frozen A contains 574 spots, fresh-frozen B 445, FFPE UP-10072 / UP-9059 629, and FFPE UP-9121 / UP-7790 735. All eight source regions and their original zone labels and integrated CCA embedding are retained. Each capture has its own image, preparation label, scale, and spot radius. No source observations are excluded. Every encoded expression value was checked against the source matrix with maximum absolute float32 error below 0.000001. See `late-passage-validation.json`.
 
 Release checks passed: all four late-passage overlays, capture counts, Region 7 isolation (74 spots), HOPX search and spot expression, seven format tests, TypeScript checking, and the GitHub Pages production build.
+
+## Fresh-frozen HD expansion
+
+The full baseline, CAR-T, and hypoxia HD series is documented in [HD-DATASETS.md](HD-DATASETS.md). New expression chunks have a `.bin.gz` suffix and are losslessly decompressed before interpreting offsets; older `.bin` chunks remain supported.

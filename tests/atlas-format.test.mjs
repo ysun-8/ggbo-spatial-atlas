@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import { decodeExpression, validateSpatialData, filterCaptureSpots } from '../lib/atlas-format.mjs';
 
 function encode(indices, values) {
@@ -68,4 +69,14 @@ test('identical coordinates from separate captures never share a spatial view', 
   assert.deepEqual(filterCaptureSpots(spots, { regions: [{ id: 's1' }] }).map(s => s.id), ['a:1']);
   assert.deepEqual(filterCaptureSpots(spots, { regions: [{ id: 's2' }] }).map(s => s.id), ['b:1']);
   assert.deepEqual(filterCaptureSpots(spots, { regions: [{ id: 's1' }] }, 's2'), []);
+});
+
+test('browser gzip decompression preserves sparse indices and expression values', async () => {
+  const original = encode([0, 65536, 131503], [0.693147, 5.7, 1.25]);
+  const response = new Response(gzipSync(new Uint8Array(original)));
+  const restored = await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+  assert.deepEqual(new Uint8Array(restored), new Uint8Array(original));
+  assert.equal(decodeExpression(restored, { offset: 0, detected: 3 }, 131504, v2)[131503], 1.25);
+  const truncated = new Response(gzipSync(new Uint8Array(original)).subarray(0, 12));
+  await assert.rejects(new Response(truncated.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
 });

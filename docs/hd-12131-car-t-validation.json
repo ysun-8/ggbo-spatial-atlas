@@ -1,0 +1,33 @@
+{
+  "dataset": "hd-12131-car-t",
+  "source_object": "FF_Visium_HD_10_2025/Objects/visium_hd_12131_CAR_T_Annotated_082026.RDS",
+  "observations": 4496,
+  "source_observations": 4496,
+  "intentionally_excluded": 0,
+  "genes": 12768,
+  "geometry": {
+    "slice1": {
+      "capture": "hd-2025-c",
+      "count": 2401,
+      "scale": 0.31512606,
+      "x_range": [1299.07840162467, 2175.6917463033],
+      "y_range": [548.115557537154, 1258.3024577999]
+    },
+    "slice3": {
+      "capture": "hd-2025-c",
+      "count": 1722,
+      "scale": 0.31512606,
+      "x_range": [1137.48434179128, 1686.58234347299],
+      "y_range": [2027.39387157237, 3362.40030393967]
+    },
+    "slice5": {
+      "capture": "hd-2025-c",
+      "count": 373,
+      "scale": 0.31512606,
+      "x_range": [1131.99311908073, 1640.88706573685],
+      "y_range": [4294.67942670678, 4717.4017468257]
+    }
+  },
+  "encoding": "uint32-float32-v2",
+  "max_expression_roundtrip_error": 1.85090935467258e-07
+}

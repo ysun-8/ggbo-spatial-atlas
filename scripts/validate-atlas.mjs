@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { decodeExpression, validateSpatialData } from '../lib/atlas-format.mjs';
 
@@ -13,7 +14,8 @@ const cache = new Map();
 function bufferAt(base, payload, gene) {
   const file = path.join(base, payload.dataset.gene_data_path, gene.chunk);
   if (!cache.has(file)) {
-    const bytes = fs.readFileSync(file);
+    const raw = fs.readFileSync(file);
+    const bytes = file.endsWith('.gz') ? gunzipSync(raw) : raw;
     cache.set(file, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
   }
   return cache.get(file);

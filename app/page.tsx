@@ -273,6 +273,10 @@ export default function Home() {
     if (!request) {
       request = fetch(chunkUrl).then((response) => {
         if (!response.ok) throw new Error(`Unable to load ${selectedGene}`);
+        if (stats.chunk!.endsWith('.gz')) {
+          if (!response.body) throw new Error('Missing compressed gene data');
+          return new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+        }
         return response.arrayBuffer();
       });
       geneChunkCache.current.set(chunkUrl, request);

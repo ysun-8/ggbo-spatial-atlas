@@ -138,6 +138,19 @@ for (chunk_start in seq.int(1L, length(genes), by = 128L)) {
   }
   close(connection)
 }
+if (isTRUE(recipe$gzip)) {
+  for (filename in unique(vapply(stats, function(stat) stat$chunk, character(1)))) {
+    source <- file.path(chunk_path, filename)
+    bytes <- readBin(source, 'raw', n = file.info(source)$size)
+    compressed <- gzfile(paste0(source, '.gz'), 'wb', compression = 9)
+    writeBin(bytes, compressed); close(compressed)
+    check <- gzfile(paste0(source, '.gz'), 'rb')
+    restored <- readBin(check, 'raw', n = length(bytes)); close(check)
+    if (!identical(bytes, restored)) stop('Compressed chunk differs from validated binary')
+    unlink(source)
+  }
+  stats <- lapply(stats, function(stat) { stat$chunk <- paste0(stat$chunk, '.gz'); stat })
+}
 entry$expression$encoding <- 'uint32-float32-v2'
 entry$path <- paste0('/data/', id, '.json')
 entry$source_object <- basename(source_path)

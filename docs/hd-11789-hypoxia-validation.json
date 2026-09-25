@@ -1,0 +1,33 @@
+{
+  "dataset": "hd-11789-hypoxia",
+  "source_object": "FF_Visium_HD_10_2025/Objects/visium_hd_11789_Hypoxia_Annotated_022026.RDS",
+  "observations": 10619,
+  "source_observations": 10619,
+  "intentionally_excluded": 0,
+  "genes": 13997,
+  "geometry": {
+    "slice2": {
+      "capture": "hd-2025-d",
+      "count": 5700,
+      "scale": 0.39393342,
+      "x_range": [4303.87926087949, 5068.92850390628],
+      "y_range": [770.503548403814, 1795.31569661867]
+    },
+    "slice5": {
+      "capture": "hd-2025-d",
+      "count": 2993,
+      "scale": 0.39393342,
+      "x_range": [4470.9971998643, 5052.97906353972],
+      "y_range": [2070.64539242826, 3017.49001427742]
+    },
+    "slice7": {
+      "capture": "hd-2025-d",
+      "count": 1926,
+      "scale": 0.39393342,
+      "x_range": [4447.13075258003, 5031.1815176243],
+      "y_range": [3829.72158998857, 4711.21582994982]
+    }
+  },
+  "encoding": "uint32-float32-v2",
+  "max_expression_roundtrip_error": 1.91725144205179e-07
+}

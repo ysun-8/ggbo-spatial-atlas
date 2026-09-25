@@ -1,0 +1,40 @@
+{
+  "dataset": "hd-11972-baseline",
+  "source_object": "FF_Visium_HD_10_2025/Objects/visium_hd_11972_011726.RDS",
+  "observations": 8598,
+  "source_observations": 8598,
+  "intentionally_excluded": 0,
+  "genes": 14597,
+  "geometry": {
+    "slice1": {
+      "capture": "hd-2025-a",
+      "count": 1398,
+      "scale": 0.30013505,
+      "x_range": [1752.10919583124, 2412.6005887866],
+      "y_range": [691.791475198446, 1037.39224353866]
+    },
+    "slice4": {
+      "capture": "hd-2025-a",
+      "count": 3216,
+      "scale": 0.30013505,
+      "x_range": [1193.90869220633, 1800.96857185771],
+      "y_range": [1672.00901180151, 2447.41134786692]
+    },
+    "slice5": {
+      "capture": "hd-2025-a",
+      "count": 2363,
+      "scale": 0.30013505,
+      "x_range": [1781.87386356749, 2459.41540767398],
+      "y_range": [2330.10737324136, 2972.51993901203]
+    },
+    "slice7": {
+      "capture": "hd-2025-a",
+      "count": 1621,
+      "scale": 0.30013505,
+      "x_range": [1199.25459527939, 1673.50828055592],
+      "y_range": [3902.72567617647, 4607.67589736152]
+    }
+  },
+  "encoding": "uint32-float32-v2",
+  "max_expression_roundtrip_error": 2.35925713631957e-07
+}

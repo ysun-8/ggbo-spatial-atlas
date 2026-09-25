@@ -321,6 +321,313 @@
       "embedding_label": "Integrated CCA"
     },
     {
+      "id": "hd-11972-baseline",
+      "label": "Visium HD \u00b7 UP-11972 \u00b7 baseline",
+      "path": "/data/hd-11972-baseline.json",
+      "name": "UP-11972 \u00b7 baseline",
+      "cohort": "FF Visium HD October 2025",
+      "kind": "hd",
+      "preparation": "fresh-frozen",
+      "study_group": "baseline",
+      "tissue_type": "gGBO",
+      "observation_label": "cell",
+      "annotation_field": "identity",
+      "embedding": "umap",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "One capture with 4 retained baseline GBO regions from UP-11972. Cells are shown by their segmentation centers.",
+      "captures": [
+        {
+          "id": "hd-2025-a",
+          "label": "Capture A",
+          "image": "/hd-2025-a.png",
+          "width": 6000,
+          "height": 5332,
+          "marker_radius": 9,
+          "regions": [
+            {
+              "id": "slice1",
+              "label": "Region 1"
+            },
+            {
+              "id": "slice4",
+              "label": "Region 4"
+            },
+            {
+              "id": "slice5",
+              "label": "Region 5"
+            },
+            {
+              "id": "slice7",
+              "label": "Region 7"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "SCT UMAP"
+    },
+    {
+      "id": "hd-11789-baseline",
+      "label": "Visium HD \u00b7 UP-11789 \u00b7 baseline",
+      "path": "/data/hd-11789-baseline.json",
+      "name": "UP-11789 \u00b7 baseline",
+      "cohort": "FF Visium HD October 2025",
+      "kind": "hd",
+      "preparation": "fresh-frozen",
+      "study_group": "baseline",
+      "tissue_type": "gGBO",
+      "observation_label": "cell",
+      "annotation_field": "identity",
+      "embedding": "umap",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "One capture with 4 retained baseline GBO regions from UP-11789. Cells are shown by their segmentation centers.",
+      "captures": [
+        {
+          "id": "hd-2025-a",
+          "label": "Capture A",
+          "image": "/hd-2025-a.png",
+          "width": 6000,
+          "height": 5332,
+          "marker_radius": 9,
+          "regions": [
+            {
+              "id": "slice2",
+              "label": "Region 2"
+            },
+            {
+              "id": "slice3",
+              "label": "Region 3"
+            },
+            {
+              "id": "slice6",
+              "label": "Region 6"
+            },
+            {
+              "id": "slice8",
+              "label": "Region 8"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "SCT UMAP"
+    },
+    {
+      "id": "hd-12131-baseline",
+      "label": "Visium HD \u00b7 UP-12131 \u00b7 baseline",
+      "path": "/data/hd-12131-baseline.json",
+      "name": "UP-12131 \u00b7 baseline",
+      "cohort": "FF Visium HD October 2025",
+      "kind": "hd",
+      "preparation": "fresh-frozen",
+      "study_group": "baseline",
+      "tissue_type": "gGBO",
+      "observation_label": "cell",
+      "annotation_field": "identity",
+      "embedding": "umap",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "One capture with 3 retained baseline GBO regions from UP-12131. Cells are shown by their segmentation centers.",
+      "captures": [
+        {
+          "id": "hd-2025-b",
+          "label": "Capture B",
+          "image": "/hd-2025-b.png",
+          "width": 6000,
+          "height": 4986,
+          "marker_radius": 9,
+          "regions": [
+            {
+              "id": "slice3",
+              "label": "Region 3"
+            },
+            {
+              "id": "slice5",
+              "label": "Region 5"
+            },
+            {
+              "id": "slice7",
+              "label": "Region 7"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "SCT UMAP"
+    },
+    {
+      "id": "hd-12163-baseline",
+      "label": "Visium HD \u00b7 UP-12163 \u00b7 baseline",
+      "path": "/data/hd-12163-baseline.json",
+      "name": "UP-12163 \u00b7 baseline",
+      "cohort": "FF Visium HD October 2025",
+      "kind": "hd",
+      "preparation": "fresh-frozen",
+      "study_group": "baseline",
+      "tissue_type": "gGBO",
+      "observation_label": "cell",
+      "annotation_field": "identity",
+      "embedding": "umap",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "One capture with 4 retained baseline GBO regions from UP-12163. Cells are shown by their segmentation centers.",
+      "captures": [
+        {
+          "id": "hd-2025-b",
+          "label": "Capture B",
+          "image": "/hd-2025-b.png",
+          "width": 6000,
+          "height": 4986,
+          "marker_radius": 9,
+          "regions": [
+            {
+              "id": "slice1",
+              "label": "Region 1"
+            },
+            {
+              "id": "slice2",
+              "label": "Region 2"
+            },
+            {
+              "id": "slice4",
+              "label": "Region 4"
+            },
+            {
+              "id": "slice6",
+              "label": "Region 6"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "SCT UMAP"
+    },
+    {
+      "id": "hd-12131-car-t",
+      "label": "Visium HD \u00b7 UP-12131 \u00b7 CAR-T",
+      "path": "/data/hd-12131-car-t.json",
+      "name": "UP-12131 \u00b7 CAR-T",
+      "cohort": "FF Visium HD October 2025",
+      "kind": "hd",
+      "preparation": "fresh-frozen",
+      "study_group": "CAR-T",
+      "tissue_type": "gGBO",
+      "observation_label": "cell",
+      "annotation_field": "identity",
+      "embedding": "umap",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "One capture with 3 retained CAR-T GBO regions from UP-12131. Cells are shown by their segmentation centers.",
+      "captures": [
+        {
+          "id": "hd-2025-c",
+          "label": "Capture C",
+          "image": "/hd-12163.png",
+          "width": 6000,
+          "height": 5984,
+          "marker_radius": 9,
+          "regions": [
+            {
+              "id": "slice1",
+              "label": "Region 1"
+            },
+            {
+              "id": "slice3",
+              "label": "Region 3"
+            },
+            {
+              "id": "slice5",
+              "label": "Region 5"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "SCT UMAP"
+    },
+    {
       "id": "hd-12163",
       "label": "Visium HD \u00b7 UP-12163 \u00b7 CAR-T",
       "path": "/data/hd-12163.json",
@@ -365,6 +672,128 @@
             {
               "id": "slice2",
               "label": "Region 2"
+            },
+            {
+              "id": "slice4",
+              "label": "Region 4"
+            },
+            {
+              "id": "slice6",
+              "label": "Region 6"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "SCT UMAP"
+    },
+    {
+      "id": "hd-11789-hypoxia",
+      "label": "Visium HD \u00b7 UP-11789 \u00b7 hypoxia",
+      "path": "/data/hd-11789-hypoxia.json",
+      "name": "UP-11789 \u00b7 hypoxia",
+      "cohort": "FF Visium HD October 2025",
+      "kind": "hd",
+      "preparation": "fresh-frozen",
+      "study_group": "hypoxia",
+      "tissue_type": "gGBO",
+      "observation_label": "cell",
+      "annotation_field": "identity",
+      "embedding": "umap",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "One capture with 3 retained hypoxia GBO regions from UP-11789. Cells are shown by their segmentation centers.",
+      "captures": [
+        {
+          "id": "hd-2025-d",
+          "label": "Capture D",
+          "image": "/hd-2025-d.png",
+          "width": 6000,
+          "height": 5732,
+          "marker_radius": 9,
+          "regions": [
+            {
+              "id": "slice2",
+              "label": "Region 2"
+            },
+            {
+              "id": "slice5",
+              "label": "Region 5"
+            },
+            {
+              "id": "slice7",
+              "label": "Region 7"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "SCT UMAP"
+    },
+    {
+      "id": "hd-12163-hypoxia",
+      "label": "Visium HD \u00b7 UP-12163 \u00b7 hypoxia",
+      "path": "/data/hd-12163-hypoxia.json",
+      "name": "UP-12163 \u00b7 hypoxia",
+      "cohort": "FF Visium HD October 2025",
+      "kind": "hd",
+      "preparation": "fresh-frozen",
+      "study_group": "hypoxia",
+      "tissue_type": "gGBO",
+      "observation_label": "cell",
+      "annotation_field": "identity",
+      "embedding": "umap",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "One capture with 4 retained hypoxia GBO regions from UP-12163. Cells are shown by their segmentation centers.",
+      "captures": [
+        {
+          "id": "hd-2025-d",
+          "label": "Capture D",
+          "image": "/hd-2025-d.png",
+          "width": 6000,
+          "height": 5732,
+          "marker_radius": 9,
+          "regions": [
+            {
+              "id": "slice1",
+              "label": "Region 1"
+            },
+            {
+              "id": "slice3",
+              "label": "Region 3"
             },
             {
               "id": "slice4",
