@@ -1,0 +1,236 @@
+{
+  "schema_version": 2,
+  "default_dataset": "primary-26455a4",
+  "datasets": [
+    {
+      "id": "primary-26455a4",
+      "label": "Visium HD \u00b7 primary GBM \u00b7 26455A4",
+      "path": "/data/primary-26455a4.json.gz",
+      "name": "26455A4",
+      "cohort": "FFPE Visium HD January 2026",
+      "kind": "hd",
+      "preparation": "FFPE",
+      "study_group": "primary GBM",
+      "tissue_type": "primary GBM",
+      "observation_label": "cell",
+      "annotation_field": "identity",
+      "embedding": "umap",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "Primary GBM tissue with original source annotations. Cells are shown by segmentation centers.",
+      "captures": [
+        {
+          "id": "primary-26455a4-capture",
+          "label": "26455A4",
+          "image": "/primary-26455a4.png",
+          "width": 4849,
+          "height": 6000,
+          "marker_radius": 4,
+          "regions": [
+            {
+              "id": "slice1.polygons",
+              "label": "Tissue"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "SCT UMAP",
+      "navigation": {
+        "group": "hd-primary",
+        "label": "Visium HD \u00b7 primary GBM",
+        "line": "26455A4"
+      }
+    },
+    {
+      "id": "primary-41602a8",
+      "label": "Visium HD \u00b7 primary GBM \u00b7 41602A8",
+      "path": "/data/primary-41602a8.json.gz",
+      "name": "41602A8",
+      "cohort": "FFPE Visium HD January 2026",
+      "kind": "hd",
+      "preparation": "FFPE",
+      "study_group": "primary GBM",
+      "tissue_type": "primary GBM",
+      "observation_label": "cell",
+      "annotation_field": "identity",
+      "embedding": "umap",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "Primary GBM tissue with original source annotations. Cells are shown by segmentation centers.",
+      "captures": [
+        {
+          "id": "primary-41602a8-capture",
+          "label": "41602A8",
+          "image": "/primary-41602a8.png",
+          "width": 5189,
+          "height": 6000,
+          "marker_radius": 4,
+          "regions": [
+            {
+              "id": "slice1.polygons",
+              "label": "Tissue"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "SCT UMAP",
+      "navigation": {
+        "group": "hd-primary",
+        "label": "Visium HD \u00b7 primary GBM",
+        "line": "41602A8"
+      }
+    },
+    {
+      "id": "primary-26941a3",
+      "label": "Visium HD \u00b7 primary GBM \u00b7 26941A3",
+      "path": "/data/primary-26941a3.json.gz",
+      "name": "26941A3",
+      "cohort": "FFPE Visium HD January 2026",
+      "kind": "hd",
+      "preparation": "FFPE",
+      "study_group": "primary GBM",
+      "tissue_type": "primary GBM",
+      "observation_label": "cell",
+      "annotation_field": "identity",
+      "embedding": "umap",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "Primary GBM tissue with original source annotations. Cells are shown by segmentation centers.",
+      "captures": [
+        {
+          "id": "primary-26941a3-capture",
+          "label": "26941A3",
+          "image": "/primary-26941a3.png",
+          "width": 4645,
+          "height": 6000,
+          "marker_radius": 4,
+          "regions": [
+            {
+              "id": "slice1.polygons",
+              "label": "Tissue"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "SCT UMAP",
+      "navigation": {
+        "group": "hd-primary",
+        "label": "Visium HD \u00b7 primary GBM",
+        "line": "26941A3"
+      }
+    },
+    {
+      "id": "primary-26547a15",
+      "label": "Visium HD \u00b7 primary GBM \u00b7 26547A15",
+      "path": "/data/primary-26547a15.json.gz",
+      "name": "26547A15",
+      "cohort": "FFPE Visium HD January 2026",
+      "kind": "hd",
+      "preparation": "FFPE",
+      "study_group": "primary GBM",
+      "tissue_type": "primary GBM",
+      "observation_label": "cell",
+      "annotation_field": "identity",
+      "embedding": "umap",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "Primary GBM tissue with original source annotations. Cells are shown by segmentation centers.",
+      "captures": [
+        {
+          "id": "primary-26547a15-capture",
+          "label": "26547A15",
+          "image": "/primary-26547a15.png",
+          "width": 4667,
+          "height": 6000,
+          "marker_radius": 4,
+          "regions": [
+            {
+              "id": "slice1.polygons",
+              "label": "Tissue"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "SCT UMAP",
+      "navigation": {
+        "group": "hd-primary",
+        "label": "Visium HD \u00b7 primary GBM",
+        "line": "26547A15"
+      }
+    }
+  ],
+  "site": {
+    "title": "Primary GBM Spatial Atlas",
+    "description": "Primary FFPE Visium HD with linked histology, gene expression, and source annotations.",
+    "alternate_label": "gGBOs",
+    "alternate_url": "https://ysun-8.github.io/ggbo-spatial-atlas/"
+  }
+}

@@ -49,8 +49,12 @@ for (capture in entry$captures) {
     if (length(scale) != 1L || !is.finite(scale) || scale <= 0) stop('Invalid image scale')
     if (!is.null(capture_scale) && abs(capture_scale - scale) > 1e-10) stop('Regions sharing an image have different scales')
     capture_scale <- scale
-    xx <- coords$x * scale
-    yy <- coords$y * scale
+    coordinate_order <- if (is.null(image_recipe$coordinate_order)) 'xy' else image_recipe$coordinate_order
+    if (!coordinate_order %in% c('xy', 'yx')) stop('Unknown coordinate order')
+    full_x <- if (coordinate_order == 'yx') coords$y else coords$x
+    full_y <- if (coordinate_order == 'yx') coords$x else coords$y
+    xx <- full_x * scale
+    yy <- full_y * scale
     if (any(!is.finite(c(xx, yy))) || any(xx < 0 | xx > capture$width | yy < 0 | yy > capture$height)) stop('Coordinates outside configured image')
     start <- length(ordered_cells)
     part <- lapply(seq_along(cells), function(j) {
@@ -62,13 +66,13 @@ for (capture in entry$captures) {
       if (is.na(line) || !nzchar(line)) stop('Missing observation line or sample')
       annotation_fields <- intersect(c('ident', 'identity', 'myeloid_ident', 'immune_ident'), names(meta))
       list(id = paste(id, cell, sep = ':'), barcode = cell, index = start + j - 1L,
-        x = xx[j], y = yy[j], fullres_x = coords$x[j], fullres_y = coords$y[j],
+        x = xx[j], y = yy[j], fullres_x = full_x[j], fullres_y = full_y[j],
         umap_x = umap[cell, 1], umap_y = umap[cell, 2], line = line, slice = region$id, capture = capture$id,
         identity = identity, annotations = lapply(meta[annotation_fields], as.character), cluster = as.character(meta[[recipe$cluster_field]]),
         counts = as.numeric(meta[[recipe$count_field]]), features = as.numeric(meta[[recipe$feature_field]]), mito = as.numeric(meta[[recipe$mito_field]])) })
     records <- c(records, part)
     ordered_cells <- c(ordered_cells, cells)
-    geometry_checks[[region$id]] <- list(capture = capture$id, count = length(cells), scale = scale, x_range = range(xx), y_range = range(yy))
+    geometry_checks[[region$id]] <- list(capture = capture$id, count = length(cells), scale = scale, coordinate_order = coordinate_order, x_range = range(xx), y_range = range(yy))
   }
 }
 if (!length(ordered_cells)) stop('No observations selected')
@@ -152,7 +156,6 @@ if (isTRUE(recipe$gzip)) {
   stats <- lapply(stats, function(stat) { stat$chunk <- paste0(stat$chunk, '.gz'); stat })
 }
 entry$expression$encoding <- 'uint32-float32-v2'
-entry$path <- paste0('/data/', id, '.json')
 entry$source_object <- basename(source_path)
 entry$technology <- if (entry$kind == 'hd') '10x Genomics Visium HD' else '10x Genomics Visium'
 entry$spot_count <- length(records)
@@ -160,7 +163,15 @@ entry$lines <- I(sort(unique(vapply(records, function(r) r$line, character(1))))
 entry$slices <- I(unlist(lapply(entry$captures, function(capture) vapply(capture$regions, function(region) region$id, character(1)))))
 entry$identities <- I(sort(unique(vapply(records, function(r) r$identity, character(1)))))
 entry$gene_data_path <- paste0('/data/', id, '-genes')
-write_json(list(schema_version = 2L, dataset = entry, genes = stats, spots = records), file.path(output_root, 'data', paste0(id, '.json')), auto_unbox = TRUE, digits = NA, na = 'null')
+payload_path <- file.path(output_root, sub('^/', '', entry$path))
+payload <- toJSON(list(schema_version = 2L, dataset = entry, genes = stats, spots = records), auto_unbox = TRUE, digits = NA, na = 'null')
+if (endsWith(payload_path, '.gz')) {
+  connection <- gzfile(payload_path, 'wt', compression = 9)
+  writeLines(payload, connection); close(connection)
+  connection <- gzfile(payload_path, 'rt')
+  restored <- readLines(connection, warn = FALSE); close(connection)
+  if (!identical(as.character(payload), restored)) stop('Compressed metadata differs from exported payload')
+} else writeLines(payload, payload_path)
 write_json(list(dataset = id, source_object = recipe$source, observations = length(records), source_observations = ncol(object),
   intentionally_excluded = ncol(object) - length(records), genes = length(genes), geometry = geometry_checks,
   encoding = entry$expression$encoding, max_expression_roundtrip_error = max_roundtrip_error),

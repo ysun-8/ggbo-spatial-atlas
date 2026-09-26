@@ -1,0 +1,28 @@
+{
+  "dataset": "primary-26455a4",
+  "source_object": "FFPE_Visium_HD_01_2026/26455A4/sample_26455A4_obj_051426.RDS",
+  "observations": 131504,
+  "source_observations": 131504,
+  "intentionally_excluded": 0,
+  "genes": 17871,
+  "geometry": {
+    "slice1.polygons": {
+      "capture": "primary-26455a4-capture",
+      "count": 131504,
+      "scale": 0.12626262,
+      "x_range": [
+        2104.73771876204,
+        3814.7727512246
+      ],
+      "y_range": [
+        653.419522186943,
+        2362.28661809455
+      ],
+      "coordinate_order": "yx"
+    }
+  },
+  "encoding": "uint32-float32-v2",
+  "max_expression_roundtrip_error": 2.21185206150665e-07,
+  "segmentation_bounds_checked": 131504,
+  "metadata_gzip_roundtrip": true
+}

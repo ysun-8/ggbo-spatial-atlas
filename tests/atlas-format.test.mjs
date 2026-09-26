@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { gzipSync } from 'node:zlib';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import { decodeExpression, validateSpatialData, filterCaptureSpots } from '../lib/atlas-format.mjs';
 
 function encode(indices, values) {
@@ -45,7 +45,8 @@ test('zero-expression genes and nonzero byte offsets decode correctly', () => {
 test('catalog geometry validates current payloads and rejects wrong image membership', () => {
   const catalog = JSON.parse(fs.readFileSync(new URL('../atlas/catalog.json', import.meta.url)));
   for (const entry of catalog.datasets) {
-    const data = JSON.parse(fs.readFileSync(new URL('../public' + entry.path, import.meta.url)));
+    const bytes = fs.readFileSync(new URL('../public' + entry.path, import.meta.url));
+    const data = JSON.parse(entry.path.endsWith('.gz') ? gunzipSync(bytes) : bytes);
     validateSpatialData(data, entry.captures);
     const invalid = structuredClone(data);
     invalid.spots[0].slice = 'unknown-region';

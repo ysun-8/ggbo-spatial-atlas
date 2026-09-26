@@ -13,6 +13,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 
+import { AtlasPointCanvas } from '@/components/atlas-point-canvas';
 import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/native-select';
 import catalog from '@/atlas/catalog.json';
@@ -91,6 +92,17 @@ const identityColors: Record<string, string> = {
   endothelial: '#3b8f9c',
   'IFN-response': '#7868d8',
   Myeloid: '#2c7fb8',
+  myeloid: '#2c7fb8',
+  'myeloid 1': '#2c7fb8',
+  'myeloid 2': '#7868d8',
+  'hypoxic niche': '#d34f73',
+  'necrotic core': '#7f6557',
+  'proliferating tumor': '#ef9d3c',
+  'RG-like': '#45b8ac',
+  oligo: '#859a41',
+  stroma: '#aa74a4',
+  hemorrhage: '#ac443d',
+  'hemorrhage/debris': '#ac443d',
 };
 
 const fallbackIdentityColors = ['#4d908e', '#f8961e', '#b56576', '#577590', '#8f6bb3'];
@@ -232,6 +244,10 @@ export default function Home() {
     fetch(publicPath(selectedDataset.path), { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error('Dataset unavailable');
+        if (selectedDataset.path.endsWith('.gz')) {
+          if (!response.body) throw new Error('Dataset response is empty');
+          return new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).json() as Promise<VisiumData>;
+        }
         return response.json() as Promise<VisiumData>;
       })
       .then((payload: VisiumData) => {
@@ -461,8 +477,15 @@ export default function Home() {
   const activeGradient = gradientOptions.find((option) => option.id === gradientId) ?? gradientOptions[0];
   const gradientCss = `linear-gradient(90deg, ${activeGradient.stops.join(', ')})`;
 
+  const useCanvas = filteredSpots.length > 30000;
+  const umapPoints = useMemo(() => !useCanvas || !umapBounds ? [] : filteredSpots.map((spot) => ({
+    id: spot.id, x: 14 + ((spot.umap_x - umapBounds.minX) / (umapBounds.maxX - umapBounds.minX || 1)) * 212,
+    y: 166 - ((spot.umap_y - umapBounds.minY) / (umapBounds.maxY - umapBounds.minY || 1)) * 152,
+  })), [useCanvas, umapBounds, filteredSpots]);
+
   // Camera and search updates reuse these dense layers without rebuilding points.
   const spatialPanel = useMemo(() => {
+    if (useCanvas) return null;
     return (
       <g>
         <image key={tissueImage} href={tissueImage} width={imageWidth} height={imageHeight} opacity={imageOpacity / 100} className="pointer-events-none" />
@@ -476,9 +499,13 @@ export default function Home() {
         </g>
       </g>
     );
-  }, [imageWidth, imageHeight, tissueImage, imageOpacity, filteredSpots, selectedSpot, selectedPointRadius, pointRadius, spotColors, spotOpacity, isHd]);
+  }, [useCanvas, imageWidth, imageHeight, tissueImage, imageOpacity, filteredSpots, selectedSpot, selectedPointRadius, pointRadius, spotColors, spotOpacity, isHd]);
 
-  const umapPanel = useMemo(() => (
+  const umapPanel = useMemo(() => useCanvas ? (
+    <AtlasPointCanvas points={umapPoints} colors={spotColors} viewBox="0 0 240 180" radius={1} opacity={0.76}
+      selectedId={selectedSpot?.id} label={`UMAP of visible Visium ${observationPlural}`} className="w-full aspect-[4/3] rounded-lg bg-[#f5f2ed]"
+      onSelect={(id) => { const spot = filteredSpots.find((point) => point.id === id); if (spot) setSelectedSpot(spot); }} />
+  ) : (
     <svg viewBox="0 0 240 180" className="w-full rounded-lg bg-[#f5f2ed]" aria-label={`UMAP of visible Visium ${observationPlural}`} shapeRendering="geometricPrecision">
       {umapBounds && filteredSpots.map((spot) => {
         const x = 14 + ((spot.umap_x - umapBounds.minX) / (umapBounds.maxX - umapBounds.minX || 1)) * 212;
@@ -487,7 +514,7 @@ export default function Home() {
         return <circle key={spot.id} cx={x} cy={y} r={isSelected ? (isHd ? 3.2 : 4.5) : (isHd ? 1 : 1.8)} fill={spotColors.get(spot.id)} opacity={isSelected ? 1 : 0.76} stroke={isSelected ? '#fff' : 'none'} strokeWidth={isHd ? 1.2 : 2} vectorEffect="non-scaling-stroke" onClick={() => setSelectedSpot(spot)} className="cursor-pointer" />;
       })}
     </svg>
-  ), [observationPlural, umapBounds, filteredSpots, selectedSpot, isHd, spotColors]);
+  ), [useCanvas, umapPoints, observationPlural, umapBounds, filteredSpots, selectedSpot, isHd, spotColors]);
 
   if (!data) {
     return (
@@ -508,10 +535,11 @@ export default function Home() {
             <Dna className="size-5" />
           </div>
           <div>
-            <h1 className="text-[17px] font-semibold tracking-tight">gGBO Spatial Atlas</h1>
+            <h1 className="text-[17px] font-semibold tracking-tight">{catalog.site.title}</h1>
             <p className="text-[11px] text-[#7e746a]">{data.dataset.cohort} · {data.dataset.name}</p>
           </div>
         </div>
+        <a href={catalog.site.alternate_url} className="ml-auto mr-3 rounded-lg border border-[#d7d0c5] bg-white px-3 py-2 text-xs font-medium hover:bg-[#f4f1ec]">{catalog.site.alternate_label} ↗</a>
         <div className="hidden items-center gap-2 text-xs text-[#625b54] sm:flex">
           <span className="rounded-full border border-[#d7d0c5] bg-white px-3 py-1.5">{isHd ? 'Visium HD' : 'Regular Visium'}</span>
           <span className="rounded-full border border-[#d7d0c5] bg-white px-3 py-1.5">{formatNumber(data.dataset.spot_count)} {observationPlural}</span>
@@ -541,7 +569,7 @@ export default function Home() {
           </section>
 
           {isHd && <section className="mt-3.5 space-y-1.5">
-            <label className="control-label" htmlFor="hd-line">GBO line</label>
+            <label className="control-label" htmlFor="hd-line">{data.dataset.tissue_type === 'gGBO' ? 'GBO line' : 'Sample'}</label>
             <NativeSelect id="hd-line" className="w-full bg-white" value={datasetId} onChange={(event) => setDatasetId(event.target.value)}>
               {groupEntries.map((entry) => <option key={entry.id} value={entry.id}>{entry.navigation.line}</option>)}
             </NativeSelect>
@@ -673,9 +701,12 @@ export default function Home() {
               {imageStatus === 'error' ? <><span>Histology unavailable or image dimensions do not match.</span> <button className="underline" onClick={() => setImageRetry((value) => value + 1)}>Retry image</button></> : 'Loading histology…'}
             </output>}
             <div ref={spatialViewport} className="w-full max-w-[min(74vh,900px)] shrink-0" style={{ aspectRatio: `${imageWidth} / ${imageHeight}` }}>
-              <svg className="size-full overflow-visible" viewBox={spatialViewBox} role="img" aria-label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} shapeRendering="geometricPrecision">
+              {useCanvas ? <AtlasPointCanvas key={imageKey} points={filteredSpots} colors={spotColors} viewBox={spatialViewBox}
+                radius={pointRadius} opacity={spotOpacity / 100} selectedId={selectedSpot?.id}
+                label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} className="size-full"
+                background={{ url: tissueImage, width: imageWidth, height: imageHeight, opacity: imageOpacity / 100 }} /> : <svg className="size-full overflow-visible" viewBox={spatialViewBox} role="img" aria-label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} shapeRendering="geometricPrecision">
                 {spatialPanel}
-              </svg>
+              </svg>}
             </div>
 
             <div className="absolute bottom-4 left-4 rounded-xl border border-black/10 bg-[#fffefa]/95 p-3 shadow-md backdrop-blur">

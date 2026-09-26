@@ -868,5 +868,11 @@
         "line": "UP-12163"
       }
     }
-  ]
+  ],
+  "site": {
+    "title": "gGBO Spatial Atlas",
+    "description": "Glioblastoma organoid Visium and Visium HD with linked histology, gene expression, and source annotations.",
+    "alternate_label": "Primary tumors",
+    "alternate_url": "https://ysun-8.github.io/primary-gbm-spatial-atlas/"
+  }
 }

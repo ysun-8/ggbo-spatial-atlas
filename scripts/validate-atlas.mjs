@@ -7,7 +7,11 @@ const [id, root = 'public', referenceRoot] = process.argv.slice(2);
 const catalog = JSON.parse(fs.readFileSync('atlas/catalog.json'));
 const entry = catalog.datasets.find((entry) => entry.id === id);
 if (!entry) throw new Error('Unknown dataset');
-const data = JSON.parse(fs.readFileSync(path.join(root, entry.path)));
+function readPayload(base) {
+  const bytes = fs.readFileSync(path.join(base, entry.path));
+  return JSON.parse(entry.path.endsWith('.gz') ? gunzipSync(bytes) : bytes);
+}
+const data = readPayload(root);
 validateSpatialData(data, entry.captures);
 const encoding = data.dataset.expression?.encoding ?? entry.expression.encoding;
 const cache = new Map();
@@ -20,7 +24,7 @@ function bufferAt(base, payload, gene) {
   }
   return cache.get(file);
 }
-const reference = referenceRoot ? JSON.parse(fs.readFileSync(path.join(referenceRoot, entry.path))) : null;
+const reference = referenceRoot ? readPayload(referenceRoot) : null;
 const referenceGenes = reference ? new Map(reference.genes.map((gene) => [gene.gene, gene])) : null;
 if (reference && reference.spots.length !== data.spots.length) throw new Error('Migration changed observation count');
 const referenceCells = reference ? new Map(reference.spots.map((spot) => [spot.id, spot])) : null;

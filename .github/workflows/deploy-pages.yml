@@ -37,9 +37,12 @@ jobs:
       - name: Build static atlas
         env:
           GITHUB_PAGES: 'true'
-          NEXT_PUBLIC_BASE_PATH: /ggbo-spatial-atlas
+          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
           SITE_ORIGIN: https://ysun-8.github.io
         run: npm run build:pages
+
+      - name: Check published size
+        run: node scripts/check-pages-size.mjs
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

@@ -83,3 +83,7 @@ The full baseline, CAR-T, and hypoxia HD series is documented in [HD-DATASETS.md
 ## Navigation
 
 The dataset dropdown groups entries by Visium and Visium HD. HD baseline, CAR-T, and hypoxia each appear once, with a separate GBO line selector. Catalog navigation fields map these choices to the original per-object exports. Switching condition retains the current line when available; otherwise it selects the first available line. Capture, line, and tissue region choices precede display controls. Late-passage captures retain their FFPE-first order.
+
+## Primary FFPE HD expansion
+
+The separate primary catalog includes all four primary GBM samples, totaling 343,558 cells, under one dataset group with a sample selector. See [Primary FFPE Visium HD](PRIMARY-HD-DATASETS.md) for cell and gene counts, the capture-specific coordinate correction, source geometry checks, and the remaining browser and hosting work. The primary atlas is deployed from its own repository to stay within the GitHub Pages site-size limit.

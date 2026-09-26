@@ -197,5 +197,77 @@
       }
     },
     "gzip": true
+  },
+  "primary-26455a4": {
+    "source": "FFPE_Visium_HD_01_2026/26455A4/sample_26455A4_obj_051426.RDS",
+    "line_field": "line",
+    "identity_field": "identity",
+    "cluster_field": "seurat_clusters",
+    "count_field": "nCount_Spatial.Polygons",
+    "feature_field": "nFeature_Spatial.Polygons",
+    "mito_field": "perc.mito",
+    "captures": {
+      "primary-26455a4-capture": {
+        "image": "FFPE_Visium_HD_01_2026/26455A4/outs/spatial/tissue_hires_image.png",
+        "scale": "hires",
+        "coordinate_order": "yx"
+      }
+    },
+    "gzip": true,
+    "line_value": "26455A4"
+  },
+  "primary-41602a8": {
+    "source": "FFPE_Visium_HD_01_2026/41602A8/sample_41602A8_obj_051426.RDS",
+    "line_field": "line",
+    "identity_field": "identity",
+    "cluster_field": "seurat_clusters",
+    "count_field": "nCount_Spatial.Polygons",
+    "feature_field": "nFeature_Spatial.Polygons",
+    "mito_field": "perc.mito",
+    "captures": {
+      "primary-41602a8-capture": {
+        "image": "FFPE_Visium_HD_01_2026/41602A8/outs/spatial/tissue_hires_image.png",
+        "scale": "hires",
+        "coordinate_order": "xy"
+      }
+    },
+    "gzip": true,
+    "line_value": "41602A8"
+  },
+  "primary-26941a3": {
+    "source": "FFPE_Visium_HD_01_2026/26941A3/sample_26941A3_obj_051426.RDS",
+    "line_field": "line",
+    "identity_field": "identity",
+    "cluster_field": "seurat_clusters",
+    "count_field": "nCount_Spatial.Polygons",
+    "feature_field": "nFeature_Spatial.Polygons",
+    "mito_field": "perc.mito",
+    "captures": {
+      "primary-26941a3-capture": {
+        "image": "FFPE_Visium_HD_01_2026/26941A3/outs/spatial/tissue_hires_image.png",
+        "scale": "hires",
+        "coordinate_order": "xy"
+      }
+    },
+    "gzip": true,
+    "line_value": "26941A3"
+  },
+  "primary-26547a15": {
+    "source": "FFPE_Visium_HD_01_2026/26547A15/sample_26547A15_obj_051426.RDS",
+    "line_field": "line",
+    "identity_field": "identity",
+    "cluster_field": "seurat_clusters",
+    "count_field": "nCount_Spatial.Polygons",
+    "feature_field": "nFeature_Spatial.Polygons",
+    "mito_field": "perc.mito",
+    "captures": {
+      "primary-26547a15-capture": {
+        "image": "FFPE_Visium_HD_01_2026/26547A15/outs/spatial/tissue_hires_image.png",
+        "scale": "hires",
+        "coordinate_order": "xy"
+      }
+    },
+    "gzip": true,
+    "line_value": "26547A15"
   }
 }
