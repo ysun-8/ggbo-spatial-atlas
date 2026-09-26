@@ -8,24 +8,12 @@ gGBOs form a hypoxia gradient from the rim to the core, and their tumor cells or
 
 ## What's included
 
-| Group | Technology | Samples | Condition | Spots / cells |
-| --- | --- | --- | --- | ---: |
-| Late-passage gGBOs | Visium (fresh-frozen and FFPE) | 4 patient lines | Baseline | 2,383 spots |
-| Early-passage gGBOs | Visium (fresh-frozen) | UP-11556, UP-11662 | Baseline | 908 spots |
-| | | | CAR-T | 566 spots |
-| | | | Radiation + temozolomide | 795 spots |
-| gGBOs | Visium HD (fresh-frozen) | UP-11972, UP-11789, UP-12131, UP-12163 | Baseline (20% O2) | 64,189 cells |
-| | | UP-11789, UP-12163 | 5% O2 | 24,031 cells |
-| | | UP-12131, UP-12163 | CAR-T | 21,535 cells |
-| Primary GBM | Visium HD (FFPE) | 4 surgical samples | Untreated | 343,558 cells |
-
-| Totals | Spots / cells |
-| --- | ---: |
-| gGBO Visium spots | 4,652 spots |
-| gGBO Visium HD cells | 109,755 cells |
-| Primary GBM Visium HD cells | 343,558 cells |
-| All Visium HD cells | 453,313 cells |
-| **All data** | **4,652 spots and 453,313 cells** |
+| Group | Technology | Samples | Conditions |
+| --- | --- | --- | --- |
+| **Late-passage gGBOs** | Visium<br>fresh-frozen and FFPE | 4 patient lines<br>2,383 spots | Baseline |
+| **Early-passage gGBOs** | Visium<br>fresh-frozen | 2 patient lines<br>2,269 spots | Baseline<br>CAR-T<br>Radiation + temozolomide |
+| **gGBOs** | Visium HD<br>fresh-frozen | 4 patient lines<br>109,755 cells | Baseline (20% O2)<br>5% O2<br>CAR-T |
+| **Primary GBM** | Visium HD<br>FFPE | 4 surgical samples<br>343,558 cells | Untreated |
 
 Every dataset includes all spots or cells and all genes from its source Seurat object. Counts for each line and sample are in [docs/DATASETS.md](docs/DATASETS.md).
 
