@@ -209,9 +209,9 @@ export default function Home() {
   const [lineFilter, setLineFilter] = useState('all');
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const needsExpression = displayMode === 'gene' || selectedSpot !== null;
-  const [imageOpacity, setImageOpacity] = useState(88);
-  const [spotOpacity, setSpotOpacity] = useState(84);
-  const [hdDotSize, setHdDotSize] = useState(100);
+  const [imageOpacity, setImageOpacity] = useState(50);
+  const [spotOpacity, setSpotOpacity] = useState(80);
+  const [hdDotSize, setHdDotSize] = useState(60);
   const spatialViewport = useRef<HTMLDivElement | null>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   const maxZoom = data?.dataset.kind === 'hd' ? hdMaxZoom : regularMaxZoom;
