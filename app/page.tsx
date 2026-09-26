@@ -420,23 +420,26 @@ export default function Home() {
     });
   };
 
-  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    if (dragStart.current) return;
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const cursorX = event.clientX - bounds.left - bounds.width / 2;
-    const cursorY = event.clientY - bounds.top - bounds.height / 2;
-
-    setCamera((current) => {
-      const nextScale = Math.min(maxZoom, Math.max(minZoom, current.scale * Math.exp(-event.deltaY * 0.0015)));
-      const ratio = nextScale / current.scale;
-      return {
-        x: cursorX - (cursorX - current.x) * ratio,
-        y: cursorY - (cursorY - current.y) * ratio,
-        scale: nextScale,
-      };
-    });
-  };
+  // React registers wheel listeners as passive, so preventDefault only works on a native listener.
+  const spatialPanelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const element = spatialPanelRef.current;
+    if (!element) return;
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      if (dragStart.current) return;
+      const bounds = element.getBoundingClientRect();
+      const cursorX = event.clientX - bounds.left - bounds.width / 2;
+      const cursorY = event.clientY - bounds.top - bounds.height / 2;
+      setCamera((current) => {
+        const nextScale = Math.min(maxZoom, Math.max(minZoom, current.scale * Math.exp(-event.deltaY * 0.0015)));
+        const ratio = nextScale / current.scale;
+        return { x: cursorX - (cursorX - current.x) * ratio, y: cursorY - (cursorY - current.y) * ratio, scale: nextScale };
+      });
+    };
+    element.addEventListener('wheel', handleWheel, { passive: false });
+    return () => element.removeEventListener('wheel', handleWheel);
+  }, [data, maxZoom]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || !event.isPrimary || dragStart.current) return;
@@ -738,7 +741,7 @@ export default function Home() {
 
           <div
             className={`relative flex min-h-0 flex-1 touch-none select-none items-center justify-center overflow-hidden rounded-2xl border border-[#cbc3b8] bg-[#ded9d1] p-2 shadow-[0_12px_35px_rgba(63,49,39,0.08)] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-            onWheel={handleWheel}
+            ref={spatialPanelRef}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
