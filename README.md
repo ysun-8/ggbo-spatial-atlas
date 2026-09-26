@@ -18,3 +18,7 @@ Data are split across two sites.
 ## Contact
 
 Please report problems through [GitHub issues](https://github.com/ysun-8/ggbo-spatial-atlas/issues).
+
+## License
+
+MIT. See [LICENSE](LICENSE).

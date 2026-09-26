@@ -108,6 +108,15 @@ const identityColors: Record<string, string> = {
   'hemorrhage/debris': '#ac443d',
 };
 
+const identityNames: Record<string, string> = {
+  OPZ: 'Outer proliferative zone',
+  IQZ: 'Intermediate quiescent zone',
+  HCZ: 'Hypoxic core zone',
+  IR: 'Immune-responsive tumor',
+  'IR tumor 1': 'Immune-responsive tumor 1',
+  'IR tumor 2': 'Immune-responsive tumor 2',
+};
+
 const fallbackIdentityColors = ['#4d908e', '#f8961e', '#b56576', '#577590', '#8f6bb3'];
 const minZoom = 0.8;
 const regularMaxZoom = 3;
@@ -753,7 +762,7 @@ export default function Home() {
                 <><div className="mb-2 flex items-center justify-between gap-6 text-[12px] font-medium"><span>{selectedGene}</span><span className="text-[#7d746c]">{geneError ? 'Unavailable' : geneLoading || (isHd && !geneValues) ? 'Loading…' : `0 – ${colorCeiling.toFixed(2)}`}</span></div><div className="h-3 w-48 rounded-full" style={{ background: gradientCss }} /><p className="mt-1 max-w-48 text-[10px] text-[#7d746c]">{hasManualMax ? 'Manual maximum' : '95th percentile of detected cells'} · Values above the maximum use the top color.</p></>
               ) : (
                 <div className="flex max-w-72 flex-wrap gap-x-4 gap-y-2">
-                  {data.dataset.identities.map((identity) => <span key={identity} className="flex items-center gap-2 text-[13px] font-medium"><i className="size-3 rounded-full" style={{ background: getIdentityColor(identity) }} />{identity}</span>)}
+                  {data.dataset.identities.map((identity) => <span key={identity} title={identityNames[identity]} className="flex items-center gap-2 text-[13px] font-medium"><i className="size-3 rounded-full" style={{ background: getIdentityColor(identity) }} />{identity}</span>)}
                 </div>
               )}
             </div>
