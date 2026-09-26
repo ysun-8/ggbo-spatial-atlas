@@ -640,7 +640,7 @@
           "VIM"
         ]
       },
-      "description": "gGBOs from UP-12131 after CAR-T cell co-culture.",
+      "description": "gGBOs from UP-12131 after co-culture with dual-targeting EGFR/IL13Rα2 CAR-T cells.",
       "captures": [
         {
           "id": "hd-2025-c",
@@ -704,7 +704,7 @@
           "VIM"
         ]
       },
-      "description": "gGBOs from UP-12163 after CAR-T cell co-culture.",
+      "description": "gGBOs from UP-12163 after co-culture with dual-targeting EGFR/IL13Rα2 CAR-T cells.",
       "captures": [
         {
           "id": "hd-2025-c",
