@@ -17,3 +17,21 @@ The exporter never modifies the source RDS files, and it stops if any exported v
 
 - `data/<id>.json` (or `.json.gz`) holds cell positions, annotations, QC values, UMAP coordinates, and per-gene summary values.
 - `data/<id>-genes/chunk-NNN.bin` (or `.bin.gz`) holds expression, 128 genes per chunk. Each gene is stored as its nonzero cell indices (uint32) followed by their values (float32). Cells without an entry have a value of zero.
+
+## Run the viewer locally
+
+Requires Node.js 22.13 or later.
+
+```sh
+npm ci
+npm run dev
+```
+
+## Test and build the site
+
+```sh
+npm test
+GITHUB_PAGES=true NEXT_PUBLIC_BASE_PATH=/ggbo-spatial-atlas npm run build:pages
+```
+
+Pushing to `main` builds and deploys the site to GitHub Pages.
