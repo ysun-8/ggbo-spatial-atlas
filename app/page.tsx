@@ -186,7 +186,6 @@ export default function Home() {
   };
   const [selectedCaptureId, setSelectedCaptureId] = useState('');
   const activeCapture = data?.dataset.captures.find((capture) => capture.id === selectedCaptureId) ?? data?.dataset.captures[0];
-  const [selectedSlice, setSelectedSlice] = useState('all');
   const [selectedGene, setSelectedGene] = useState('CA9');
   const [manualMax, setManualMax] = useState('');
   const [urlReady, setUrlReady] = useState(false);
@@ -283,7 +282,6 @@ export default function Home() {
         if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
         cameraFrame.current = null;
         pendingCamera.current = null;
-        setSelectedSlice(capture.regions.some((region) => region.id === view?.region) ? view!.region : 'all');
         const gene = view?.gene ?? 'CA9';
         setSelectedGene(payload.genes.some((item) => item.gene === gene) ? gene : payload.genes[0]?.gene ?? '');
         setDisplayMode(view?.mode === 'gene' ? 'gene' : 'identity');
@@ -360,8 +358,8 @@ export default function Home() {
 
   const filteredSpots = useMemo(() => {
     if (!data) return [];
-    return filterCaptureSpots(data.spots, activeCapture, selectedSlice, lineFilter) as Spot[];
-  }, [data, activeCapture, lineFilter, selectedSlice]);
+    return filterCaptureSpots(data.spots, activeCapture, 'all', lineFilter) as Spot[];
+  }, [data, activeCapture, lineFilter]);
 
   const automaticCeiling = useMemo(() => {
     if (geneValues) return detectedCeiling(geneValues);
@@ -373,9 +371,9 @@ export default function Home() {
   const colorCeiling = hasManualMax ? parsedMax : automaticCeiling;
   useEffect(() => {
     if (!urlReady || !data || data.dataset.id !== datasetId) return;
-    const query = writeView({ dataset: datasetId, capture: selectedCaptureId, region: selectedSlice, line: lineFilter, gene: selectedGene, mode: displayMode, max: hasManualMax ? String(parsedMax) : '' });
+    const query = writeView({ dataset: datasetId, capture: selectedCaptureId, line: lineFilter, gene: selectedGene, mode: displayMode, max: hasManualMax ? String(parsedMax) : '' });
     window.history.replaceState(null, '', window.location.pathname + query + window.location.hash);
-  }, [urlReady, data, datasetId, selectedCaptureId, selectedSlice, lineFilter, selectedGene, displayMode, hasManualMax, parsedMax]);
+  }, [urlReady, data, datasetId, selectedCaptureId, lineFilter, selectedGene, displayMode, hasManualMax, parsedMax]);
   const matchingGenes = useMemo(() => {
     const query = search.toLowerCase();
     return data?.genes.filter((gene) => gene.gene.toLowerCase().includes(query)) ?? [];
@@ -598,7 +596,6 @@ export default function Home() {
               <SlidersHorizontal className="size-4 text-[#8f315d]" />
               Explore
             </div>
-            <span className="text-[11px] text-[#877d73]">Prototype</span>
           </div>
 
           <section className="space-y-1.5">
@@ -624,7 +621,7 @@ export default function Home() {
             <section className="mt-3.5 space-y-1.5">
               <label className="control-label" htmlFor="capture-area">Capture area</label>
               <NativeSelect id="capture-area" className="w-full bg-white" value={activeCapture?.id} onChange={(event) => {
-                setSelectedCaptureId(event.target.value); setSelectedSlice('all'); setLineFilter('all'); setSelectedSpot(null);
+                setSelectedCaptureId(event.target.value); setLineFilter('all'); setSelectedSpot(null);
                 if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
                 cameraFrame.current = null; pendingCamera.current = null;
                 setCamera({ x: 0, y: 0, scale: 1 });
@@ -643,19 +640,6 @@ export default function Home() {
               ))}
             </div>
           </section>}
-
-          {activeCapture && activeCapture.regions.length > 1 && (
-            <section className="mt-3.5 space-y-1.5">
-              <p className="control-label">Tissue region</p>
-              <div className="flex flex-wrap gap-1.5">
-                {[{ id: 'all', label: 'All' }, ...activeCapture.regions].map((region) => (
-                  <Button key={region.id} variant={selectedSlice === region.id ? 'default' : 'outline'} size="sm" className={selectedSlice === region.id ? 'bg-[#9f3d6c] hover:bg-[#9f3d6c]/90' : 'bg-white'} onClick={() => { setSelectedSlice(region.id); setSelectedSpot(null); setCamera({ x: 0, y: 0, scale: 1 }); }}>
-                    {region.label}
-                  </Button>
-                ))}
-              </div>
-            </section>
-          )}
 
           <section className="mt-3.5 space-y-1.5">
             <p className="control-label">Color {observationPlural} by</p>
@@ -689,7 +673,6 @@ export default function Home() {
           {isHd && <section className="mt-3.5 space-y-1.5">
             <label className="flex items-center justify-between text-xs" htmlFor="hd-dot-size"><span className="control-label">Cell dot size</span><span>{hdDotSize}%</span></label>
             <input id="hd-dot-size" className="atlas-range w-full" type="range" min="25" max="100" step="5" value={hdDotSize} onChange={(event) => setHdDotSize(Number(event.target.value))} />
-            <p className="text-[10px] text-[#91877d]">Display markers show cell centers, not cell boundaries. HD zoom supports up to 20×.</p>
           </section>}
 
           <section className="mt-3.5 space-y-1.5">
@@ -814,9 +797,8 @@ export default function Home() {
             </div>
           )}
           <div className="mt-4 rounded-xl border border-[#d7d0c5] bg-[#f1ece5] p-3 text-[11px] leading-4 text-[#6e665f]">
-            <div className="mb-1 flex items-center gap-1.5 font-semibold text-[#4d4742]"><ImageIcon className="size-3.5" />Prototype scope</div>
-            {data.dataset.description} {formatNumber(data.genes.length)} {data.dataset.expression.assay} genes available.
-
+            <div className="mb-1 flex items-center gap-1.5 font-semibold text-[#4d4742]"><ImageIcon className="size-3.5" />About this dataset</div>
+            {data.dataset.description}
           </div>
         </aside>
       </div>
