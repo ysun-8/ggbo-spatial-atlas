@@ -13,7 +13,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 
-import { detectedCeiling, readView, writeView, assetPath } from '@/lib/atlas-display.mjs';
+import { detectedCeiling, readView, writeView, assetPath, pinchCamera } from '@/lib/atlas-display.mjs';
 import { AtlasPointCanvas } from '@/components/atlas-point-canvas';
 import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -441,7 +441,29 @@ export default function Home() {
     return () => element.removeEventListener('wheel', handleWheel);
   }, [data, maxZoom]);
 
+  // On touch screens, one-finger vertical swipes scroll the page (touch-action: pan-y),
+  // one-finger horizontal drags pan the image, and two fingers pinch to zoom.
+  const touches = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ x: number; y: number; distance: number; camera: typeof camera } | null>(null);
+  const touchGesture = (element: HTMLElement) => {
+    const [a, b] = [...touches.current.values()];
+    const bounds = element.getBoundingClientRect();
+    return { x: (a.x + b.x) / 2 - bounds.left - bounds.width / 2, y: (a.y + b.y) / 2 - bounds.top - bounds.height / 2,
+      distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)) };
+  };
+
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') {
+      touches.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (touches.current.size === 2) {
+        event.currentTarget.setPointerCapture(event.pointerId);
+        pinch.current = { ...touchGesture(event.currentTarget), camera: pendingCamera.current ?? camera };
+        dragStart.current = null;
+        didDrag.current = true;
+        setIsDragging(false);
+        return;
+      }
+    }
     if (event.button !== 0 || !event.isPrimary || dragStart.current) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const spotId = (event.target as SVGElement).getAttribute?.('data-spot-id') ?? null;
@@ -458,6 +480,13 @@ export default function Home() {
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch' && touches.current.has(event.pointerId)) {
+      touches.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pinch.current && touches.current.size === 2) {
+        scheduleCamera(pinchCamera(pinch.current, touchGesture(event.currentTarget), minZoom, maxZoom));
+        return;
+      }
+    }
     if (!dragStart.current || dragStart.current.pointerId !== event.pointerId) return;
     const deltaX = event.clientX - dragStart.current.pointerX;
     const deltaY = event.clientY - dragStart.current.pointerY;
@@ -470,6 +499,18 @@ export default function Home() {
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    touches.current.delete(event.pointerId);
+    if (pinch.current) {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      if (touches.current.size < 2) {
+        if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
+        cameraFrame.current = null;
+        if (pendingCamera.current) setCamera(pendingCamera.current);
+        pendingCamera.current = null;
+        pinch.current = null;
+      }
+      return;
+    }
     if (!dragStart.current || dragStart.current.pointerId !== event.pointerId) return;
     // Commit the final drag position before a subsequent reset or zoom action.
     if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
@@ -744,7 +785,7 @@ export default function Home() {
           </div>
 
           <div
-            className={`relative flex min-h-0 flex-1 touch-none select-none items-center justify-center overflow-hidden rounded-2xl border border-[#cbc3b8] bg-[#ded9d1] p-2 shadow-[0_12px_35px_rgba(63,49,39,0.08)] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            className={`relative flex min-h-0 flex-1 touch-pan-y select-none items-center justify-center overflow-hidden rounded-2xl border border-[#cbc3b8] bg-[#ded9d1] p-2 shadow-[0_12px_35px_rgba(63,49,39,0.08)] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
             ref={spatialPanelRef}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
