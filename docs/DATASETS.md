@@ -35,26 +35,6 @@ All expression values are SCT-transformed from source Seurat objects. Every expo
 
 Source object paths for every dataset are listed in `scripts/export-config.json`.
 
-## Add or update a dataset
-
-1. Add an entry to `atlas/catalog.json` and a recipe to `scripts/export-config.json`.
-2. Export into an empty folder, then validate:
-
-   ```sh
-   Rscript scripts/export_atlas.R <dataset-id> /path/to/GBM_Spatial /tmp/atlas-export
-   node scripts/validate-atlas.mjs <dataset-id> /tmp/atlas-export
-   ```
-
-3. Copy the exported `data` folder and images into `public/`. For primary GBM data, copy them into the data host repository instead.
-4. Save the export's `validation.json` in `docs/` as `<dataset-id>-validation.json`.
-
-The exporter only reads the source RDS files. It checks that image sizes match the catalog, that every cell falls inside its image, and that every exported expression value matches the source matrix.
-
-## File format
-
-- `data/<id>.json` (or `.json.gz`) holds cell positions, annotations, QC values, UMAP coordinates, and per-gene summary values.
-- `data/<id>-genes/chunk-NNN.bin` (or `.bin.gz`) holds expression, 128 genes per chunk. Each gene is stored as its nonzero cell indices (uint32) followed by their values (float32). Cells without an entry have a value of zero.
-
 ## Notes
 
 - Visium HD cells are displayed as circles as opposed to segmented cells. 

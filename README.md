@@ -4,7 +4,8 @@ An interactive viewer for spatial transcriptomics from giant glioblastoma organo
 
 **Live site:** https://ysun-8.github.io/ggbo-spatial-atlas/
 
-- Datasets and how to add one: [docs/DATASETS.md](docs/DATASETS.md)
+- Datasets in the atlas: [docs/DATASETS.md](docs/DATASETS.md)
+- Adding or updating a dataset: [docs/ADDING-DATA.md](docs/ADDING-DATA.md)
 - Methods page shown on the site: [public/about.html](public/about.html)
 
 ## Run locally
