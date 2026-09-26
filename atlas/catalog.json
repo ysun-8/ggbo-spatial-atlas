@@ -34,7 +34,7 @@
           "VIM"
         ]
       },
-      "description": "Four physical captures with eight retained late-passage baseline GBO regions. Fresh-frozen and FFPE captures are shown separately.",
+      "description": "Late-passage gGBOs from four patient lines at baseline. Fresh-frozen and FFPE sections are on separate capture areas; use Capture area to switch between them.",
       "captures": [
         {
           "id": "regular-2024-10-ffpe-10072-9059",
@@ -152,7 +152,7 @@
           "VIM"
         ]
       },
-      "description": "One capture area with five retained baseline GBO regions from UP-11556 and UP-11662.",
+      "description": "Early-passage gGBOs from UP-11556 and UP-11662 at baseline.",
       "captures": [
         {
           "id": "regular-2024-12-a",
@@ -224,7 +224,7 @@
           "VIM"
         ]
       },
-      "description": "One capture area with 6 retained CAR-T GBO regions from UP-11556 and UP-11662.",
+      "description": "Early-passage gGBOs from UP-11556 and UP-11662 after co-culture with dual-targeting EGFR/IL13Rα2 CAR-T cells.",
       "captures": [
         {
           "id": "regular-2024-12-b",
@@ -300,7 +300,7 @@
           "VIM"
         ]
       },
-      "description": "One capture area with 5 retained radiation GBO regions from UP-11556 and UP-11662.",
+      "description": "Early-passage gGBOs from UP-11556 and UP-11662, 5 days after 10 Gy radiation and 100 μM temozolomide.",
       "captures": [
         {
           "id": "regular-2024-12-c",
@@ -372,7 +372,7 @@
           "VIM"
         ]
       },
-      "description": "One capture with 4 retained baseline GBO regions from UP-11972. Cells are shown by their segmentation centers.",
+      "description": "gGBOs from UP-11972 at baseline (20% O2).",
       "captures": [
         {
           "id": "hd-2025-a",
@@ -440,7 +440,7 @@
           "VIM"
         ]
       },
-      "description": "One capture with 4 retained baseline GBO regions from UP-11789. Cells are shown by their segmentation centers.",
+      "description": "gGBOs from UP-11789 at baseline (20% O2).",
       "captures": [
         {
           "id": "hd-2025-a",
@@ -508,7 +508,7 @@
           "VIM"
         ]
       },
-      "description": "One capture with 3 retained baseline GBO regions from UP-12131. Cells are shown by their segmentation centers.",
+      "description": "gGBOs from UP-12131 at baseline (20% O2).",
       "captures": [
         {
           "id": "hd-2025-b",
@@ -572,7 +572,7 @@
           "VIM"
         ]
       },
-      "description": "One capture with 4 retained baseline GBO regions from UP-12163. Cells are shown by their segmentation centers.",
+      "description": "gGBOs from UP-12163 at baseline (20% O2).",
       "captures": [
         {
           "id": "hd-2025-b",
@@ -640,7 +640,7 @@
           "VIM"
         ]
       },
-      "description": "One capture with 3 retained CAR-T GBO regions from UP-12131. Cells are shown by their segmentation centers.",
+      "description": "gGBOs from UP-12131 after CAR-T cell co-culture.",
       "captures": [
         {
           "id": "hd-2025-c",
@@ -704,7 +704,7 @@
           "VIM"
         ]
       },
-      "description": "One capture area with three retained GBO regions. Cells are shown by their segmentation centers.",
+      "description": "gGBOs from UP-12163 after CAR-T cell co-culture.",
       "captures": [
         {
           "id": "hd-2025-c",
@@ -768,7 +768,7 @@
           "VIM"
         ]
       },
-      "description": "One capture with 3 retained hypoxia GBO regions from UP-11789. Cells are shown by their segmentation centers.",
+      "description": "gGBOs from UP-11789 cultured at 5% O2 for 3 days.",
       "captures": [
         {
           "id": "hd-2025-d",
@@ -832,7 +832,7 @@
           "VIM"
         ]
       },
-      "description": "One capture with 4 retained hypoxia GBO regions from UP-12163. Cells are shown by their segmentation centers.",
+      "description": "gGBOs from UP-12163 cultured at 5% O2 for 3 days.",
       "captures": [
         {
           "id": "hd-2025-d",
@@ -900,7 +900,7 @@
           "VIM"
         ]
       },
-      "description": "Primary GBM tissue with original source annotations. Cells are shown by segmentation centers.",
+      "description": "Primary GBM surgical sample (FFPE). Tumor cells are labeled by state (proliferating tumor, RG-like, hypoxic niche); other cells by cell type.",
       "captures": [
         {
           "id": "primary-26455a4-capture",
@@ -957,7 +957,7 @@
           "VIM"
         ]
       },
-      "description": "Primary GBM tissue with original source annotations. Cells are shown by segmentation centers.",
+      "description": "Primary GBM surgical sample (FFPE). Tumor cells are labeled by state (proliferating tumor, RG-like, hypoxic niche); other cells by cell type.",
       "captures": [
         {
           "id": "primary-41602a8-capture",
@@ -1014,7 +1014,7 @@
           "VIM"
         ]
       },
-      "description": "Primary GBM tissue with original source annotations. Cells are shown by segmentation centers.",
+      "description": "Primary GBM surgical sample (FFPE). Tumor cells are labeled by state (proliferating tumor, RG-like, hypoxic niche); other cells by cell type.",
       "captures": [
         {
           "id": "primary-26941a3-capture",
@@ -1071,7 +1071,7 @@
           "VIM"
         ]
       },
-      "description": "Primary GBM tissue with original source annotations. Cells are shown by segmentation centers.",
+      "description": "Primary GBM surgical sample (FFPE). Tumor cells are labeled by state (proliferating tumor, RG-like, hypoxic niche); other cells by cell type.",
       "captures": [
         {
           "id": "primary-26547a15-capture",
