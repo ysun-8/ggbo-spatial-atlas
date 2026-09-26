@@ -1,6 +1,6 @@
 # Datasets
 
-All expression values are SCT/data from the source Seurat objects. Every exported dataset keeps all cells or spots and all genes in the source object. Identity labels and UMAPs come from the source objects unchanged.
+All expression values are SCT-transformed from source Seurat objects. Every exported dataset keeps all cells or spots and all genes in the source object. Identity labels and UMAPs come from the source objects unchanged.
 
 ## Organoid Visium
 
@@ -11,7 +11,7 @@ All expression values are SCT/data from the source Seurat objects. Every exporte
 | Early-passage CAR-T | 566 | 11,391 | `GBO_CART_Visium_Round_2_081926.RDS` |
 | Early-passage radiation | 795 | 16,028 | `GBO_Rad_Visium_Round_2_122825.RDS` |
 
-## Organoid Visium HD (fresh-frozen, October 2025)
+## Organoid Visium HD (fresh-frozen)
 
 | Line | Condition | Cells | Genes |
 | --- | --- | ---: | ---: |
@@ -24,7 +24,7 @@ All expression values are SCT/data from the source Seurat objects. Every exporte
 | UP-11789 | Hypoxia | 10,619 | 13,997 |
 | UP-12163 | Hypoxia | 13,412 | 15,406 |
 
-## Primary GBM Visium HD (FFPE, January 2026)
+## Primary GBM Visium HD (FFPE)
 
 | Sample | Cells | Genes |
 | --- | ---: | ---: |
@@ -57,6 +57,5 @@ The exporter only reads the source RDS files. It checks that image sizes match t
 
 ## Notes
 
-- Visium HD markers show cell centers, not cell outlines.
-- For primary sample 26455A4, the source object stores coordinates in y, x order. The exporter corrects this with `coordinate_order: "yx"` in its recipe.
+- Visium HD cells are displayed as circles as opposed to segmented cells. 
 - Some organoid captures share one image, so you may see tissue without markers. That tissue belongs to another dataset or was not part of the source object.
