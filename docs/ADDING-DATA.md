@@ -9,7 +9,8 @@
    ```
 
 3. Copy the exported `data` folder and images into `public/`. For primary GBM data, copy them into the data host repository instead.
-4. Save the export's `validation.json` in `docs/` as `<dataset-id>-validation.json`.
+4. Make the histology previews the viewer shows while full images load: `python3 scripts/make-histology-previews.py ../primary-gbm-spatial-data-host/public`. Add a `preview` path next to each capture's `image` in the catalog.
+5. Save the export's `validation.json` in `docs/` as `<dataset-id>-validation.json`.
 
 The exporter never modifies the source RDS files, and it stops if any exported value doesn't match the source.
 

@@ -501,6 +501,7 @@ export default function Home() {
   const imageWidth = activeCapture?.width ?? 1;
   const imageHeight = activeCapture?.height ?? 1;
   const tissueImage = activeCapture ? publicPath(activeCapture.image, data?.dataset.asset_base_url) : '';
+  const previewImage = activeCapture?.preview ? publicPath(activeCapture.preview, data?.dataset.asset_base_url) : '';
   const pointRadius = (activeCapture?.marker_radius ?? 1) * (isHd ? hdDotSize / 100 : 1);
   const selectedPointRadius = pointRadius * 1.5;
   const [imageState, setImageState] = useState<{ key: string; status: 'loaded' | 'error' } | null>(null);
@@ -539,7 +540,10 @@ export default function Home() {
     if (useCanvas) return null;
     return (
       <g>
-        <image key={tissueImage} href={tissueImage} width={imageWidth} height={imageHeight} opacity={imageOpacity / 100} className="pointer-events-none" />
+        <g opacity={imageOpacity / 100} className="pointer-events-none">
+          {previewImage && <image key={previewImage} href={previewImage} width={imageWidth} height={imageHeight} />}
+          <image key={tissueImage} href={tissueImage} width={imageWidth} height={imageHeight} />
+        </g>
         <g>
           {filteredSpots.map((spot) => {
             const isSelected = selectedSpot?.id === spot.id;
@@ -550,7 +554,7 @@ export default function Home() {
         </g>
       </g>
     );
-  }, [useCanvas, imageWidth, imageHeight, tissueImage, imageOpacity, filteredSpots, selectedSpot, selectedPointRadius, pointRadius, spotColors, spotOpacity, isHd]);
+  }, [useCanvas, imageWidth, imageHeight, tissueImage, previewImage, imageOpacity, filteredSpots, selectedSpot, selectedPointRadius, pointRadius, spotColors, spotOpacity, isHd]);
 
   const umapPanel = useMemo(() => useCanvas ? (
     <AtlasPointCanvas points={umapPoints} colors={spotColors} viewBox="0 0 240 180" radius={1} opacity={0.76}
@@ -748,14 +752,14 @@ export default function Home() {
             onPointerCancel={handlePointerUp}
           >
             {imageStatus !== 'loaded' && <output className="absolute left-4 top-4 z-10 rounded-lg bg-white/95 p-2 text-xs">
-              {imageStatus === 'error' ? <><span>Histology unavailable or image dimensions do not match.</span> <button className="underline" onClick={() => setImageRetry((value) => value + 1)}>Retry image</button></> : 'Loading histology…'}
+              {imageStatus === 'error' ? <><span>Histology unavailable or image dimensions do not match.</span> <button className="underline" onClick={() => setImageRetry((value) => value + 1)}>Retry image</button></> : 'Loading full-resolution histology…'}
             </output>}
             <div ref={spatialViewport} className="absolute inset-2">
               {useCanvas ? <AtlasPointCanvas key={imageKey} points={filteredSpots} colors={spotColors} viewBox={spatialViewBox}
                 radius={pointRadius} opacity={spotOpacity / 100} selectedId={selectedSpot?.id}
                 onKeyboardSelect={(id) => { const spot = filteredSpots.find((point) => point.id === id); if (spot) setSelectedSpot(spot); }}
                 label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} className="size-full"
-                background={{ url: tissueImage, width: imageWidth, height: imageHeight, opacity: imageOpacity / 100 }} /> : <svg className="size-full overflow-visible" viewBox={spatialViewBox} aria-label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} shapeRendering="geometricPrecision">
+                background={{ url: tissueImage, previewUrl: previewImage, width: imageWidth, height: imageHeight, opacity: imageOpacity / 100 }} /> : <svg className="size-full overflow-visible" viewBox={spatialViewBox} aria-label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} shapeRendering="geometricPrecision">
                 {spatialPanel}
               </svg>}
             </div>
