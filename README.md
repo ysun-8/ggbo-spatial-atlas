@@ -1,6 +1,6 @@
 # gGBO Spatial Atlas
 
-An interactive viewer for spatial transcriptomics from glioblastoma organoids (gGBOs) and primary GBM tissue.
+An interactive viewer for spatial transcriptomics from giant glioblastoma organoids (gGBOs) and primary GBM tissue.
 
 **Live site:** https://ysun-8.github.io/ggbo-spatial-atlas/
 
