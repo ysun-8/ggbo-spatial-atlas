@@ -212,7 +212,7 @@ export default function Home() {
   const [spotOpacity, setSpotOpacity] = useState(80);
   const [hdDotSize, setHdDotSize] = useState(40);
   const spatialViewport = useRef<HTMLDivElement | null>(null);
-  const [viewportWidth, setViewportWidth] = useState(0);
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const maxZoom = data?.dataset.kind === 'hd' ? hdMaxZoom : regularMaxZoom;
   const [camera, setCamera] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
@@ -240,7 +240,7 @@ export default function Home() {
   useEffect(() => {
     const element = spatialViewport.current;
     if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setViewportWidth(entry.contentRect.width));
+    const observer = new ResizeObserver(([entry]) => setViewportSize({ width: entry.contentRect.width, height: entry.contentRect.height }));
     observer.observe(element);
     return () => observer.disconnect();
   }, [data]);
@@ -506,9 +506,12 @@ export default function Home() {
     image.src = tissueImage;
     return () => { active = false; image.onload = null; image.onerror = null; };
   }, [tissueImage, imageWidth, imageHeight, imageKey]);
-  const viewWidth = imageWidth / camera.scale;
-  const viewHeight = imageHeight / camera.scale;
-  const imageUnitsPerPixel = imageWidth / (viewportWidth || imageWidth) / camera.scale;
+  // The view box matches the panel's shape, so zoomed-in views fill the whole panel.
+  const panelWidth = viewportSize.width || imageWidth;
+  const panelHeight = viewportSize.height || imageHeight;
+  const imageUnitsPerPixel = Math.max(imageWidth / panelWidth, imageHeight / panelHeight) / camera.scale;
+  const viewWidth = panelWidth * imageUnitsPerPixel;
+  const viewHeight = panelHeight * imageUnitsPerPixel;
   const spatialViewBox = `${(imageWidth - viewWidth) / 2 - camera.x * imageUnitsPerPixel} ${(imageHeight - viewHeight) / 2 - camera.y * imageUnitsPerPixel} ${viewWidth} ${viewHeight}`;
   const activeGradient = gradientOptions.find((option) => option.id === gradientId) ?? gradientOptions[0];
   const gradientCss = `linear-gradient(90deg, ${activeGradient.stops.join(', ')})`;
@@ -735,7 +738,7 @@ export default function Home() {
             {imageStatus !== 'loaded' && <output className="absolute left-4 top-4 z-10 rounded-lg bg-white/95 p-2 text-xs">
               {imageStatus === 'error' ? <><span>Histology unavailable or image dimensions do not match.</span> <button className="underline" onClick={() => setImageRetry((value) => value + 1)}>Retry image</button></> : 'Loading histology…'}
             </output>}
-            <div ref={spatialViewport} className="w-full max-w-[min(74vh,900px)] shrink-0" style={{ aspectRatio: `${imageWidth} / ${imageHeight}` }}>
+            <div ref={spatialViewport} className="absolute inset-2">
               {useCanvas ? <AtlasPointCanvas key={imageKey} points={filteredSpots} colors={spotColors} viewBox={spatialViewBox}
                 radius={pointRadius} opacity={spotOpacity / 100} selectedId={selectedSpot?.id}
                 onKeyboardSelect={(id) => { const spot = filteredSpots.find((point) => point.id === id); if (spot) setSelectedSpot(spot); }}
