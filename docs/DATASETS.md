@@ -10,6 +10,7 @@ All expression values are SCT-transformed from source Seurat objects. Every expo
 | Early-passage baseline | 908 | 15,435 | `GBO_Baseline_Visium_Round_2_071326.RDS` |
 | Early-passage CAR-T | 566 | 11,391 | `GBO_CART_Visium_Round_2_081926.RDS` |
 | Early-passage radiation | 795 | 16,028 | `GBO_Rad_Visium_Round_2_122825.RDS` |
+| **Total** | **4,652** | | |
 
 ## Organoid Visium HD (fresh-frozen)
 
@@ -23,6 +24,7 @@ All expression values are SCT-transformed from source Seurat objects. Every expo
 | UP-12163 | CAR-T | 17,039 | 15,533 |
 | UP-11789 | Hypoxia | 10,619 | 13,997 |
 | UP-12163 | Hypoxia | 13,412 | 15,406 |
+| **Total** | | **109,755** | |
 
 ## Primary GBM Visium HD (FFPE)
 
@@ -32,6 +34,7 @@ All expression values are SCT-transformed from source Seurat objects. Every expo
 | 41602A8 | 89,591 | 17,634 |
 | 26941A3 | 87,500 | 17,879 |
 | 26547A15 | 34,963 | 17,680 |
+| **Total** | **343,558** | |
 
 Source object paths for every dataset are listed in `scripts/export-config.json`.
 
