@@ -10,8 +10,21 @@
 <p>Expression values are SCT/data. By default, the top of the color scale is the 95th percentile among cells that express the gene. You can enter a manual maximum instead, which is useful when comparing samples. The scale only changes colors, not the data.</p>
 <p>Identity labels and UMAPs come from each source object. UMAPs from different objects are not directly comparable.</p>
 
+<h2>Zone labels</h2>
+<p>gGBOs form a hypoxia gradient from the rim to the core, with three layers of tumor cells:</p>
+<ul>
+<li><strong>OPZ, outer proliferative zone:</strong> the rim. Actively dividing cells that express Ki-67, SOX2, and Nestin.</li>
+<li><strong>IQZ, intermediate quiescent zone:</strong> the middle layer. Non-dividing, Nestin-positive stem-like cells with radial glia features such as HOPX.</li>
+<li><strong>HCZ, hypoxic core zone:</strong> the core. Hypoxic cells with mesenchymal features such as CD44 and GLUT1.</li>
+</ul>
+<p>In the atlas, these labels come from unsupervised clustering of gene expression in each source object, not from distance to the rim. Other labels:</p>
+<ul>
+<li><strong>CAR-T datasets:</strong> CAR-T marks spots or cells dominated by CAR-T cells. IR tumor 1 and IR tumor 2 (or IR) are immune-responsive tumor populations that express genes such as ISG15, IRF1, and CXCL10.</li>
+<li><strong>Primary GBM:</strong> tumor cells are labeled by state (proliferating tumor, RG-like, hypoxic niche). Other labels are non-tumor cell types or tissue features.</li>
+</ul>
+
 <h2>Sharing a view</h2>
-<p>Use “Copy link” to save the current dataset, region, gene, and color settings.</p>
+<p>Use “Copy link” to save the current dataset, gene, and color settings.</p>
 
 <h2>Source and contact</h2>
 <p>Code and data: <a href="https://github.com/ysun-8/ggbo-spatial-atlas">github.com/ysun-8/ggbo-spatial-atlas</a></p>
