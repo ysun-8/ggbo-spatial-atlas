@@ -34,7 +34,7 @@
           "VIM"
         ]
       },
-      "description": "Primary GBM tissue with original source annotations. Cells are shown by segmentation centers.",
+      "description": "Primary GBM surgical sample (FFPE). Tumor cells are labeled by state (proliferating tumor, RG-like, hypoxic niche); other cells by cell type.",
       "captures": [
         {
           "id": "primary-26455a4-capture",
@@ -90,7 +90,7 @@
           "VIM"
         ]
       },
-      "description": "Primary GBM tissue with original source annotations. Cells are shown by segmentation centers.",
+      "description": "Primary GBM surgical sample (FFPE). Tumor cells are labeled by state (proliferating tumor, RG-like, hypoxic niche); other cells by cell type.",
       "captures": [
         {
           "id": "primary-41602a8-capture",
@@ -146,7 +146,7 @@
           "VIM"
         ]
       },
-      "description": "Primary GBM tissue with original source annotations. Cells are shown by segmentation centers.",
+      "description": "Primary GBM surgical sample (FFPE). Tumor cells are labeled by state (proliferating tumor, RG-like, hypoxic niche); other cells by cell type.",
       "captures": [
         {
           "id": "primary-26941a3-capture",
@@ -202,7 +202,7 @@
           "VIM"
         ]
       },
-      "description": "Primary GBM tissue with original source annotations. Cells are shown by segmentation centers.",
+      "description": "Primary GBM surgical sample (FFPE). Tumor cells are labeled by state (proliferating tumor, RG-like, hypoxic niche); other cells by cell type.",
       "captures": [
         {
           "id": "primary-26547a15-capture",
