@@ -8,7 +8,7 @@ type Props = {
   points: Point[]; colors: Map<string, string>; viewBox: string;
   radius: number; opacity: number; selectedId?: string;
   label: string; className?: string; onSelect?: (id: string) => void; onKeyboardSelect?: (id: string) => void;
-  background?: { url: string; width: number; height: number; opacity: number };
+  background?: { url: string; previewUrl?: string; width: number; height: number; opacity: number };
 };
 
 export function AtlasPointCanvas({ points, colors, viewBox, radius, opacity, selectedId, label, className, onSelect, onKeyboardSelect, background }: Props) {
@@ -71,6 +71,8 @@ export function AtlasPointCanvas({ points, colors, viewBox, radius, opacity, sel
     }}
     onClick={onSelect ? (event) => { const id = pick(event); if (id) onSelect(id); } : undefined}>
     {background && <svg className="pointer-events-none absolute inset-0 size-full" viewBox={viewBox} aria-hidden="true" style={{ opacity: background.opacity }}>
+      {/* The small preview shows until the full-resolution image covers it. */}
+      {background.previewUrl && <image href={background.previewUrl} width={background.width} height={background.height} />}
       <image href={background.url} width={background.width} height={background.height} />
     </svg>}
     <canvas ref={canvas} className="pointer-events-none absolute inset-0 size-full" style={{ opacity }} aria-hidden="true" />
