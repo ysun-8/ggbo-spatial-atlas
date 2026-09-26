@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { detectedCeiling, readView, writeView, assetPath } from '../lib/atlas-display.mjs';
+import { detectedCeiling, readView, writeView, assetPath, pinchCamera } from '../lib/atlas-display.mjs';
 
 test('sparse genes scale on detected values without a maximum fallback', () => {
   const values = [...Array(1000).fill(0), ...Array(99).fill(2), 1000];
@@ -28,4 +28,14 @@ test('assets resolve under one viewer or an optional separate data host', () => 
   assert.equal(assetPath('/data/example.json', '/ggbo-spatial-atlas'), '/ggbo-spatial-atlas/data/example.json');
   assert.equal(assetPath('/data/example.json', '/ggbo-spatial-atlas', 'https://ysun-8.github.io/primary-gbm-spatial-atlas'), 'https://ysun-8.github.io/primary-gbm-spatial-atlas/data/example.json');
   assert.equal(assetPath('https://example.org/image.webp', '/atlas'), 'https://example.org/image.webp');
+});
+
+test('pinch zoom keeps the image point under the fingers', () => {
+  const start = { x: 40, y: -20, distance: 100, camera: { x: 10, y: 5, scale: 2 } };
+  // The image point under the start midpoint, in unscaled panel units.
+  const anchor = { x: (start.x - start.camera.x) / start.camera.scale, y: (start.y - start.camera.y) / start.camera.scale };
+  const next = pinchCamera(start, { x: 70, y: 0, distance: 150 }, 0.8, 20);
+  assert.equal(next.scale, 3);
+  assert.ok(Math.abs(next.x + anchor.x * next.scale - 70) < 1e-9 && Math.abs(next.y + anchor.y * next.scale - 0) < 1e-9);
+  assert.equal(pinchCamera(start, { x: 40, y: -20, distance: 10000 }, 0.8, 20).scale, 20);
 });
