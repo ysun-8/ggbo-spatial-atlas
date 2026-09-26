@@ -211,7 +211,7 @@ export default function Home() {
   const needsExpression = displayMode === 'gene' || selectedSpot !== null;
   const [imageOpacity, setImageOpacity] = useState(50);
   const [spotOpacity, setSpotOpacity] = useState(80);
-  const [hdDotSize, setHdDotSize] = useState(60);
+  const [hdDotSize, setHdDotSize] = useState(40);
   const spatialViewport = useRef<HTMLDivElement | null>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   const maxZoom = data?.dataset.kind === 'hd' ? hdMaxZoom : regularMaxZoom;
@@ -688,7 +688,7 @@ export default function Home() {
 
           {isHd && <section className="mt-3.5 space-y-1.5">
             <label className="flex items-center justify-between text-xs" htmlFor="hd-dot-size"><span className="control-label">Cell dot size</span><span>{hdDotSize}%</span></label>
-            <input id="hd-dot-size" className="atlas-range w-full" type="range" min="25" max="150" step="5" value={hdDotSize} onChange={(event) => setHdDotSize(Number(event.target.value))} />
+            <input id="hd-dot-size" className="atlas-range w-full" type="range" min="25" max="100" step="5" value={hdDotSize} onChange={(event) => setHdDotSize(Number(event.target.value))} />
             <p className="text-[10px] text-[#91877d]">Display markers show cell centers, not cell boundaries. HD zoom supports up to 20×.</p>
           </section>}
 
