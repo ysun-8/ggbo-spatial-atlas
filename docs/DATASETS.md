@@ -86,4 +86,4 @@ The dataset dropdown groups entries by Visium and Visium HD. HD baseline, CAR-T,
 
 ## Primary FFPE HD expansion
 
-The separate primary catalog includes all four primary GBM samples, totaling 343,558 cells, under one dataset group with a sample selector. See [Primary FFPE Visium HD](PRIMARY-HD-DATASETS.md) for cell and gene counts, the capture-specific coordinate correction, source geometry checks, and the remaining browser and hosting work. The primary atlas is deployed from its own repository to stay within the GitHub Pages site-size limit.
+The separate primary catalog includes all four primary GBM samples, totaling 343,558 cells, under one dataset group with a sample selector. See [Primary FFPE Visium HD](PRIMARY-HD-DATASETS.md) for cell and gene counts, the capture-specific coordinate correction, source geometry checks, and the remaining browser and hosting work. Primary data are served from their own repository to stay within the GitHub Pages size limit, while the main atlas displays every dataset in one viewer.

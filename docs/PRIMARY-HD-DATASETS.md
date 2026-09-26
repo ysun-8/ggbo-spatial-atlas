@@ -1,6 +1,6 @@
 # Primary FFPE Visium HD
 
-All four January 2026 primary GBM objects are available in the separate Primary GBM Spatial Atlas under “Visium HD · primary GBM,” followed by a sample selector. The primary site opens 26455A4. The gGBO site continues to open Visium HD baseline UP-11789. Both sites provide a link to the other atlas.
+All four January 2026 primary GBM objects are available inside the main gGBO Spatial Atlas under “Visium HD · primary GBM,” followed by a sample selector. The default remains Visium HD baseline UP-11789. Only the data files are hosted separately.
 
 | Sample | Retained cells | SCT/data genes | Source coordinate order |
 | --- | ---: | ---: | --- |
@@ -25,7 +25,7 @@ python3 scripts/validate-primary-geometry.py /path/to/GBM_Spatial public
 
 ## Rendering and compression
 
-Views with more than 30,000 cells use canvas for both spatial and UMAP points. Canvas uses the same view-box projection as the SVG viewer and selects the nearest cell within the click radius. Spatial clicks still distinguish selection from dragging. The selected cell remains linked between the views. This avoids creating one browser element for each point, but interactive performance has not yet been measured in the browser.
+All HD views use canvas for both spatial and UMAP points. Canvas uses the same view-box projection as the SVG viewer and selects the nearest cell within the click radius. Spatial clicks still distinguish selection from dragging. The selected cell remains linked between the views. This avoids creating one browser element for each point, but interactive performance has not yet been measured in the browser.
 
 Primary metadata and expression chunks are gzip compressed without removing data. Metadata downloads total 30,065,233 bytes, compared with 163,965,925 bytes before compression. Each metadata compression round trip was checked. The browser also continues to support the older uncompressed datasets. The exporter supports compressed metadata whenever the catalog path ends in `.gz`.
 
@@ -35,4 +35,4 @@ All source expression values passed the R export round-trip checks, with maximum
 
 Interactive browser verification is pending. The browser tool could not verify its required security policy and denied access to the local preview. Consequently, pan/zoom responsiveness, rendered gene colors, and linked cell selection in the actual browser have not been claimed as verified.
 
-Before splitting the sites, the combined public assets occupied 1,375,453,092 bytes. A measured gzip estimate for all remaining plain JSON and binary files reduces this to 1,078,563,051 bytes, before application build assets. That is still above GitHub Pages' stated 1 GB published-site limit. See [GitHub Pages limits](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits). The two-repository split resolves this limit. The built gGBO site is 805,840,668 bytes and the built primary site is 572,883,664 bytes. Both workflows check the final site size before deployment. Browser interaction review remains pending.
+Before splitting the sites, the combined public assets occupied 1,375,453,092 bytes. A measured gzip estimate for all remaining plain JSON and binary files reduces this to 1,078,563,051 bytes, before application build assets. That is still above GitHub Pages' stated 1 GB published-site limit. See [GitHub Pages limits](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits). Separate data hosting resolves this limit. The main viewer is 783,157,321 bytes and the primary data host is 544,554,341 bytes. Both workflows check the final site size before deployment. Browser interaction review remains pending.

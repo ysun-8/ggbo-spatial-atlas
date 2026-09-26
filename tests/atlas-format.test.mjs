@@ -45,7 +45,13 @@ test('zero-expression genes and nonzero byte offsets decode correctly', () => {
 test('catalog geometry validates current payloads and rejects wrong image membership', () => {
   const catalog = JSON.parse(fs.readFileSync(new URL('../atlas/catalog.json', import.meta.url)));
   for (const entry of catalog.datasets) {
-    const bytes = fs.readFileSync(new URL('../public' + entry.path, import.meta.url));
+    const root = entry.asset_base_url ? process.env.ATLAS_REMOTE_ASSET_ROOT : null;
+    if (entry.asset_base_url && !root) {
+      assert.equal(entry.asset_base_url, 'https://ysun-8.github.io/primary-gbm-spatial-atlas/');
+      assert.equal(fs.existsSync(new URL('../public' + entry.path, import.meta.url)), false, 'Remote data must not inflate the viewer deployment');
+      continue;
+    }
+    const bytes = fs.readFileSync(root ? root + entry.path : new URL('../public' + entry.path, import.meta.url));
     const data = JSON.parse(entry.path.endsWith('.gz') ? gunzipSync(bytes) : bytes);
     validateSpatialData(data, entry.captures);
     const invalid = structuredClone(data);

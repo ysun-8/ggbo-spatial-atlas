@@ -26,21 +26,6 @@
       }
     }
   },
-  "hd-12163": {
-    "source": "FF_Visium_HD_10_2025/Objects/visium_hd_12163_CAR_T_Annotated_082026.RDS",
-    "line_field": "line",
-    "identity_field": "identity",
-    "cluster_field": "seurat_clusters",
-    "count_field": "nCount_Spatial.Polygons",
-    "feature_field": "nFeature_Spatial.Polygons",
-    "mito_field": "perc.mito",
-    "captures": {
-      "hd-2025-c": {
-        "image": "FF_Visium_HD_10_2025/C_CAR_T/outs/spatial/tissue_hires_image.png",
-        "scale": "hires"
-      }
-    }
-  },
   "visium-dec-baseline": {
     "source": "FF_Visium_12_2024/GBO_Baseline_Visium_Round_2_071326.RDS",
     "line_field": "line",
@@ -269,5 +254,20 @@
     },
     "gzip": true,
     "line_value": "26547A15"
+  },
+  "hd-12163-car-t": {
+    "source": "FF_Visium_HD_10_2025/Objects/visium_hd_12163_CAR_T_Annotated_082026.RDS",
+    "line_field": "line",
+    "identity_field": "identity",
+    "cluster_field": "seurat_clusters",
+    "count_field": "nCount_Spatial.Polygons",
+    "feature_field": "nFeature_Spatial.Polygons",
+    "mito_field": "perc.mito",
+    "captures": {
+      "hd-2025-c": {
+        "image": "FF_Visium_HD_10_2025/C_CAR_T/outs/spatial/tissue_hires_image.png",
+        "scale": "hires"
+      }
+    }
   }
 }

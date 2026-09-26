@@ -1,30 +1,24 @@
-# Two GitHub Pages atlases
+# One viewer with a separate data host
 
-The gGBO repository is the source of the shared viewer code. The primary repository contains the same viewer and its own data. Each published site stays below 1 GB.
+Visitors use [gGBO Spatial Atlas](https://ysun-8.github.io/ggbo-spatial-atlas/) for both organoids and primary tumors. The default remains Visium HD baseline UP-11789. Primary GBM appears in the same dataset selector, with four sample options.
 
-| Site | Repository | Default dataset |
-| --- | --- | --- |
-| [gGBO Spatial Atlas](https://ysun-8.github.io/ggbo-spatial-atlas/) | ysun-8/ggbo-spatial-atlas | UP-11789 baseline |
-| [Primary GBM Spatial Atlas](https://ysun-8.github.io/primary-gbm-spatial-atlas/) | ysun-8/primary-gbm-spatial-atlas | 26455A4 |
+The `ysun-8/primary-gbm-spatial-atlas` repository hosts only primary metadata, expression chunks, and lossless histology images. It does not host another viewer. Its root redirects to the main atlas with primary sample 26455A4 selected. The main catalog sets `asset_base_url` for these four entries, and the viewer resolves all their assets relative to that address. Both Pages sites share the ysun-8.github.io origin.
 
-Primary FFPE tumor data belong to the second site. Late-passage FFPE organoids stay in the gGBO site.
+The main build is 783,157,321 bytes and the data host is 544,554,341 bytes. Each deployment checks its own 1 GB limit. Data should be deployed and checked before viewer entries are enabled or changed.
 
-## Update the shared viewer
+## Local directories
 
-Make viewer changes in the gGBO repository, then run:
+- `visium-atlas-prototype` is the main viewer and organoid data repository.
+- `primary-gbm-spatial-data-host` is the data-only repository to publish.
+- `primary-gbm-spatial-atlas` is an unpublished local benchmark checkout retained from the earlier two-viewer proposal. Do not publish that checkout.
 
-```sh
-node scripts/sync-primary-site.mjs ../primary-gbm-spatial-atlas
-```
-
-The script copies code and documentation, and installs `atlas/primary-catalog.json` as the primary repository's active `atlas/catalog.json`. It does not copy or delete data assets, install dependencies, commit, or publish. Review and commit both repositories. Update each site's data in its own `public` directory. The complete export recipes are retained in both repositories, but exports require an entry in that repository's active catalog.
-
-Each deployment derives its base path from the repository name. Run tests and build each repository separately. The workflow rejects a built site of 1,000,000,000 bytes or more before uploading it to Pages.
+To validate the main catalog against both local asset roots:
 
 ```sh
-npm test
-GITHUB_PAGES=true NEXT_PUBLIC_BASE_PATH=/primary-gbm-spatial-atlas SITE_ORIGIN=https://ysun-8.github.io npm run build:pages
-node scripts/check-pages-size.mjs
+ATLAS_REMOTE_ASSET_ROOT=../primary-gbm-spatial-data-host/public npm test
+node scripts/validate-atlas.mjs primary-26455a4 ../primary-gbm-spatial-data-host/public
 ```
 
-Use `/ggbo-spatial-atlas` for the gGBO build. Interactive browser checks remain pending because the browser tool's required security check was unavailable during this release.
+The main repository contains all shared viewer and export code. Keep the primary data host free of application code and build dependencies. Replace a dataset's metadata and gene chunks together. `scripts/sync-primary-site.mjs` updates the optional local benchmark only; it is not the publishing workflow.
+
+Browser interaction checks remain pending because the browser tool's required security check was unavailable. Automated checks do not establish measured interaction speed.

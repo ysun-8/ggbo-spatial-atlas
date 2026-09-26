@@ -39,7 +39,7 @@
         {
           "id": "primary-26455a4-capture",
           "label": "26455A4",
-          "image": "/primary-26455a4.png",
+          "image": "/primary-26455a4.webp",
           "width": 4849,
           "height": 6000,
           "marker_radius": 4,
@@ -95,7 +95,7 @@
         {
           "id": "primary-41602a8-capture",
           "label": "41602A8",
-          "image": "/primary-41602a8.png",
+          "image": "/primary-41602a8.webp",
           "width": 5189,
           "height": 6000,
           "marker_radius": 4,
@@ -151,7 +151,7 @@
         {
           "id": "primary-26941a3-capture",
           "label": "26941A3",
-          "image": "/primary-26941a3.png",
+          "image": "/primary-26941a3.webp",
           "width": 4645,
           "height": 6000,
           "marker_radius": 4,
@@ -207,7 +207,7 @@
         {
           "id": "primary-26547a15-capture",
           "label": "26547A15",
-          "image": "/primary-26547a15.png",
+          "image": "/primary-26547a15.webp",
           "width": 4667,
           "height": 6000,
           "marker_radius": 4,

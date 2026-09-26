@@ -13,6 +13,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 
+import { detectedCeiling, readView, writeView, assetPath } from '@/lib/atlas-display.mjs';
 import { AtlasPointCanvas } from '@/components/atlas-point-canvas';
 import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -53,6 +54,8 @@ type Spot = {
 
 type VisiumData = {
   dataset: {
+    id: string;
+    asset_base_url?: string;
     name: string;
     cohort: string;
     technology: string;
@@ -90,8 +93,8 @@ const identityColors: Record<string, string> = {
   'M1 myeloid': '#458b74',
   perivascular: '#6f9847',
   endothelial: '#3b8f9c',
-  'IFN-response': '#7868d8',
-  Myeloid: '#2c7fb8',
+  'IFN-response': '#b07aa1',
+  Myeloid: '#8c6d31',
   myeloid: '#2c7fb8',
   'myeloid 1': '#2c7fb8',
   'myeloid 2': '#7868d8',
@@ -111,12 +114,12 @@ const regularMaxZoom = 3;
 const hdMaxZoom = 20;
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
-function publicPath(path: string) {
-  if (!path.startsWith('/')) return path;
-  return `${basePath}${path}`;
+function publicPath(path: string, assetBase = '') {
+  return assetPath(path, basePath, assetBase);
 }
 
-const datasetOptions = catalog.datasets;
+type DatasetEntry = (typeof catalog.datasets)[number] & { asset_base_url?: string };
+const datasetOptions: DatasetEntry[] = catalog.datasets;
 const datasetGroups = [...new Map(datasetOptions.map((entry) => [entry.navigation.group, {
   id: entry.navigation.group, label: entry.navigation.label,
 }])).values()];
@@ -185,6 +188,14 @@ export default function Home() {
   const activeCapture = data?.dataset.captures.find((capture) => capture.id === selectedCaptureId) ?? data?.dataset.captures[0];
   const [selectedSlice, setSelectedSlice] = useState('all');
   const [selectedGene, setSelectedGene] = useState('CA9');
+  const [manualMax, setManualMax] = useState('');
+  const [urlReady, setUrlReady] = useState(false);
+  const requestedView = useRef<ReturnType<typeof readView> | null>(null);
+  useEffect(() => {
+    requestedView.current = readView(window.location.search, datasetOptions, catalog.default_dataset);
+    setDatasetId(requestedView.current.dataset);
+    setUrlReady(true);
+  }, []);
   const [displayMode, setDisplayMode] = useState<'gene' | 'identity'>('identity');
   const [gradientId, setGradientId] = useState<GradientId>('seurat');
   const [geneResult, setGeneResult] = useState<{ data: VisiumData; gene: string; values: Float32Array } | null>(null);
@@ -207,6 +218,7 @@ export default function Home() {
   const [camera, setCamera] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
   const [search, setSearch] = useState('');
+  const [shareStatus, setShareStatus] = useState('Copy link');
   const dragStart = useRef<{ pointerId: number; pointerX: number; pointerY: number; cameraX: number; cameraY: number; spotId: string | null } | null>(null);
   const didDrag = useRef(false);
   const cameraFrame = useRef<number | null>(null);
@@ -224,7 +236,7 @@ export default function Home() {
       if (pendingCamera.current) setCamera(pendingCamera.current);
       pendingCamera.current = null;
     });
-  }, []);
+  }, [setCamera]);
 
   useEffect(() => {
     const element = spatialViewport.current;
@@ -237,11 +249,14 @@ export default function Home() {
   const geneChunkCache = useRef(new Map<string, Promise<ArrayBuffer>>());
 
   useEffect(() => {
+    if (!urlReady) return;
     const selectedDataset = datasetOptions.find((dataset) => dataset.id === datasetId) ?? datasetOptions[0];
     const controller = new AbortController();
+    // Clear stale dataset controls while the replacement request is in flight.
+    // oxlint-disable-next-line react/react-compiler
     setData(null);
     setDatasetError(false);
-    fetch(publicPath(selectedDataset.path), { signal: controller.signal })
+    fetch(publicPath(selectedDataset.path, selectedDataset.asset_base_url), { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error('Dataset unavailable');
         if (selectedDataset.path.endsWith('.gz')) {
@@ -260,28 +275,37 @@ export default function Home() {
           expression: { ...selectedDataset.expression, encoding: payload.dataset.expression?.encoding ?? selectedDataset.expression.encoding } } };
         validateSpatialData(merged, merged.dataset.captures);
         setData(merged);
-        setSelectedCaptureId(merged.dataset.captures[0].id);
+        const view = requestedView.current?.dataset === datasetId ? requestedView.current : null;
+        requestedView.current = null;
+        const capture = merged.dataset.captures.find((item) => item.id === view?.capture) ?? merged.dataset.captures[0];
+        setSelectedCaptureId(capture.id);
         geneChunkCache.current.clear();
         if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
         cameraFrame.current = null;
         pendingCamera.current = null;
-        setSelectedSlice('all');
-        setSelectedGene(payload.genes.some((gene) => gene.gene === 'CA9') ? 'CA9' : payload.genes[0]?.gene ?? '');
-        setDisplayMode('identity');
+        setSelectedSlice(capture.regions.some((region) => region.id === view?.region) ? view!.region : 'all');
+        const gene = view?.gene ?? 'CA9';
+        setSelectedGene(payload.genes.some((item) => item.gene === gene) ? gene : payload.genes[0]?.gene ?? '');
+        setDisplayMode(view?.mode === 'gene' ? 'gene' : 'identity');
+        setManualMax(view?.max ?? '');
         setGeneResult(null);
         setGeneError(false);
-        setGeneLoading(false);
-        setLineFilter(payload.dataset.lines.length === 1 ? payload.dataset.lines[0] : 'all');
+        // No expression request is needed in this state.
+      // oxlint-disable-next-line react/react-compiler
+      setGeneLoading(false);
+        setLineFilter(view && payload.dataset.lines.includes(view.line) ? view.line : payload.dataset.lines.length === 1 ? payload.dataset.lines[0] : 'all');
         setSelectedSpot(null);
         setCamera({ x: 0, y: 0, scale: 1 });
         setSearch('');
       })
       .catch(() => { if (!controller.signal.aborted) setDatasetError(true); });
     return () => controller.abort();
-  }, [datasetId, retry]);
+  }, [datasetId, retry, urlReady]);
 
   useEffect(() => {
     if (!data || !needsExpression || !data.dataset.gene_data_path) {
+      // Synchronize the request status when leaving expression mode.
+      // oxlint-disable-next-line react/react-compiler
       setGeneLoading(false);
       return;
     }
@@ -295,7 +319,7 @@ export default function Home() {
     }
 
     let active = true;
-    const chunkUrl = publicPath(`${data.dataset.gene_data_path}/${stats.chunk}`);
+    const chunkUrl = publicPath(`${data.dataset.gene_data_path}/${stats.chunk}`, data.dataset.asset_base_url);
     let request = geneChunkCache.current.get(chunkUrl);
     if (!request) {
       request = fetch(chunkUrl).then((response) => {
@@ -339,7 +363,19 @@ export default function Home() {
     return filterCaptureSpots(data.spots, activeCapture, selectedSlice, lineFilter) as Spot[];
   }, [data, activeCapture, lineFilter, selectedSlice]);
 
-  const selectedGeneStats = useMemo(() => data?.genes.find((gene) => gene.gene === selectedGene), [data, selectedGene]);
+  const automaticCeiling = useMemo(() => {
+    if (geneValues) return detectedCeiling(geneValues);
+    if (data && !data.dataset.gene_data_path) return detectedCeiling(data.spots.map((spot) => spot.expression?.[selectedGene] ?? 0));
+    return 0;
+  }, [geneValues, data, selectedGene]);
+  const parsedMax = Number(manualMax);
+  const hasManualMax = Number.isFinite(parsedMax) && parsedMax > 0;
+  const colorCeiling = hasManualMax ? parsedMax : automaticCeiling;
+  useEffect(() => {
+    if (!urlReady || !data || data.dataset.id !== datasetId) return;
+    const query = writeView({ dataset: datasetId, capture: selectedCaptureId, region: selectedSlice, line: lineFilter, gene: selectedGene, mode: displayMode, max: hasManualMax ? String(parsedMax) : '' });
+    window.history.replaceState(null, '', window.location.pathname + query + window.location.hash);
+  }, [urlReady, data, datasetId, selectedCaptureId, selectedSlice, lineFilter, selectedGene, displayMode, hasManualMax, parsedMax]);
   const matchingGenes = useMemo(() => {
     const query = search.toLowerCase();
     return data?.genes.filter((gene) => gene.gene.toLowerCase().includes(query)) ?? [];
@@ -352,15 +388,17 @@ export default function Home() {
     return fallbackIdentityColors[identityIndex % fallbackIdentityColors.length];
   }, [data]);
 
+  const colorValues = displayMode === 'gene' ? geneValues : null;
+  const activeCeiling = displayMode === 'gene' ? colorCeiling : 0;
   const spotColors = useMemo(() => new Map(filteredSpots.map((spot) => {
     if (displayMode === 'identity') return [spot.id, getIdentityColor(spot.identity)] as const;
-    if (data?.dataset.gene_data_path && !geneValues) return [spot.id, '#b5b5b5'] as const;
-    const ceiling = selectedGeneStats?.q95 || selectedGeneStats?.max || 1;
+    if (data?.dataset.gene_data_path && !colorValues) return [spot.id, '#b5b5b5'] as const;
+    const ceiling = activeCeiling || 1;
     const value = data?.dataset.gene_data_path && spot.index !== undefined
-      ? geneValues?.[spot.index] ?? 0
+      ? colorValues?.[spot.index] ?? 0
       : spot.expression?.[selectedGene] ?? 0;
     return [spot.id, interpolateColor(value / ceiling, gradientId)] as const;
-  })), [filteredSpots, displayMode, getIdentityColor, selectedGeneStats, data, geneValues, selectedGene, gradientId]);
+  })), [filteredSpots, displayMode, getIdentityColor, activeCeiling, data, colorValues, selectedGene, gradientId]);
 
   const getSelectedExpression = (spot: Spot) => {
     if (data?.dataset.gene_data_path && spot.index !== undefined) return geneValues?.[spot.index] ?? null;
@@ -452,7 +490,7 @@ export default function Home() {
   const observationPlural = observationSingular === 'cell' ? 'cells' : 'spots';
   const imageWidth = activeCapture?.width ?? 1;
   const imageHeight = activeCapture?.height ?? 1;
-  const tissueImage = activeCapture ? publicPath(activeCapture.image) : '';
+  const tissueImage = activeCapture ? publicPath(activeCapture.image, data?.dataset.asset_base_url) : '';
   const pointRadius = (activeCapture?.marker_radius ?? 1) * (isHd ? hdDotSize / 100 : 1);
   const selectedPointRadius = pointRadius * 1.5;
   const [imageState, setImageState] = useState<{ key: string; status: 'loaded' | 'error' } | null>(null);
@@ -477,7 +515,7 @@ export default function Home() {
   const activeGradient = gradientOptions.find((option) => option.id === gradientId) ?? gradientOptions[0];
   const gradientCss = `linear-gradient(90deg, ${activeGradient.stops.join(', ')})`;
 
-  const useCanvas = filteredSpots.length > 30000;
+  const useCanvas = isHd;
   const umapPoints = useMemo(() => !useCanvas || !umapBounds ? [] : filteredSpots.map((spot) => ({
     id: spot.id, x: 14 + ((spot.umap_x - umapBounds.minX) / (umapBounds.maxX - umapBounds.minX || 1)) * 212,
     y: 166 - ((spot.umap_y - umapBounds.minY) / (umapBounds.maxY - umapBounds.minY || 1)) * 152,
@@ -514,7 +552,7 @@ export default function Home() {
         return <circle key={spot.id} cx={x} cy={y} r={isSelected ? (isHd ? 3.2 : 4.5) : (isHd ? 1 : 1.8)} fill={spotColors.get(spot.id)} opacity={isSelected ? 1 : 0.76} stroke={isSelected ? '#fff' : 'none'} strokeWidth={isHd ? 1.2 : 2} vectorEffect="non-scaling-stroke" onClick={() => setSelectedSpot(spot)} className="cursor-pointer" />;
       })}
     </svg>
-  ), [useCanvas, umapPoints, observationPlural, umapBounds, filteredSpots, selectedSpot, isHd, spotColors]);
+  ), [useCanvas, umapPoints, observationPlural, umapBounds, filteredSpots, selectedSpot, isHd, spotColors, setSelectedSpot]);
 
   if (!data) {
     return (
@@ -529,7 +567,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#f3f0ea] text-[#201e1b]">
-      <header className="flex min-h-14 items-center justify-between border-b border-[#d7d0c5] bg-[#fbfaf7] px-4 py-2 lg:px-6">
+      <header className="flex min-h-14 flex-wrap gap-2 items-center justify-between border-b border-[#d7d0c5] bg-[#fbfaf7] px-4 py-2 lg:px-6">
         <div className="flex items-center gap-3">
           <div className="grid size-9 place-items-center rounded-xl bg-[#351d4a] text-white shadow-sm">
             <Dna className="size-5" />
@@ -539,7 +577,14 @@ export default function Home() {
             <p className="text-[11px] text-[#7e746a]">{data.dataset.cohort} · {data.dataset.name}</p>
           </div>
         </div>
-        <a href={catalog.site.alternate_url} className="ml-auto mr-3 rounded-lg border border-[#d7d0c5] bg-white px-3 py-2 text-xs font-medium hover:bg-[#f4f1ec]">{catalog.site.alternate_label} ↗</a>
+        <div className="ml-auto flex items-center gap-3 text-xs">
+          <a className="underline underline-offset-2" href={publicPath('/about.html')} target="_blank" rel="noreferrer">Methods &amp; source</a>
+          <button className="rounded-lg border border-[#d7d0c5] bg-white px-3 py-2" onClick={async () => {
+            try { await navigator.clipboard.writeText(window.location.href); setShareStatus('Link copied'); }
+            catch { setShareStatus('Copy from address bar'); }
+            window.setTimeout(() => setShareStatus('Copy link'), 3000);
+          }}>{shareStatus}</button>
+        </div>
         <div className="hidden items-center gap-2 text-xs text-[#625b54] sm:flex">
           <span className="rounded-full border border-[#d7d0c5] bg-white px-3 py-1.5">{isHd ? 'Visium HD' : 'Regular Visium'}</span>
           <span className="rounded-full border border-[#d7d0c5] bg-white px-3 py-1.5">{formatNumber(data.dataset.spot_count)} {observationPlural}</span>
@@ -634,6 +679,13 @@ export default function Home() {
             </section>
           )}
 
+          {displayMode === 'gene' && <section className="mt-3.5 space-y-1.5">
+            <label className="control-label" htmlFor="expression-max">Expression maximum</label>
+            <input id="expression-max" type="number" min="0.000001" step="any" placeholder="Automatic (detected-cell P95)" value={manualMax} onChange={(event) => setManualMax(event.target.value)} className="w-full rounded-md border border-[#d7d0c5] bg-white px-2 py-1.5 text-xs" />
+            <p className="text-[10px] text-[#91877d]">Leave blank for automatic scaling. Enter the same maximum to compare samples. Values are {data.dataset.expression.assay}/{data.dataset.expression.layer}.</p>
+            {manualMax && !hasManualMax && <p className="text-xs text-red-700">Enter a positive maximum. Automatic scaling is active.</p>}
+          </section>}
+
           {isHd && <section className="mt-3.5 space-y-1.5">
             <label className="flex items-center justify-between text-xs" htmlFor="hd-dot-size"><span className="control-label">Cell dot size</span><span>{hdDotSize}%</span></label>
             <input id="hd-dot-size" className="atlas-range w-full" type="range" min="25" max="150" step="5" value={hdDotSize} onChange={(event) => setHdDotSize(Number(event.target.value))} />
@@ -703,15 +755,16 @@ export default function Home() {
             <div ref={spatialViewport} className="w-full max-w-[min(74vh,900px)] shrink-0" style={{ aspectRatio: `${imageWidth} / ${imageHeight}` }}>
               {useCanvas ? <AtlasPointCanvas key={imageKey} points={filteredSpots} colors={spotColors} viewBox={spatialViewBox}
                 radius={pointRadius} opacity={spotOpacity / 100} selectedId={selectedSpot?.id}
+                onKeyboardSelect={(id) => { const spot = filteredSpots.find((point) => point.id === id); if (spot) setSelectedSpot(spot); }}
                 label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} className="size-full"
-                background={{ url: tissueImage, width: imageWidth, height: imageHeight, opacity: imageOpacity / 100 }} /> : <svg className="size-full overflow-visible" viewBox={spatialViewBox} role="img" aria-label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} shapeRendering="geometricPrecision">
+                background={{ url: tissueImage, width: imageWidth, height: imageHeight, opacity: imageOpacity / 100 }} /> : <svg className="size-full overflow-visible" viewBox={spatialViewBox} aria-label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} shapeRendering="geometricPrecision">
                 {spatialPanel}
               </svg>}
             </div>
 
             <div className="absolute bottom-4 left-4 rounded-xl border border-black/10 bg-[#fffefa]/95 p-3 shadow-md backdrop-blur">
               {displayMode === 'gene' ? (
-                <><div className="mb-2 flex items-center justify-between gap-6 text-[12px] font-medium"><span>{selectedGene}</span><span className="text-[#7d746c]">{geneError ? 'Unavailable' : geneLoading || (isHd && !geneValues) ? 'Loading…' : `0 – ${(selectedGeneStats?.q95 || selectedGeneStats?.max || 0).toFixed(2)}`}</span></div><div className="h-3 w-48 rounded-full" style={{ background: gradientCss }} /></>
+                <><div className="mb-2 flex items-center justify-between gap-6 text-[12px] font-medium"><span>{selectedGene}</span><span className="text-[#7d746c]">{geneError ? 'Unavailable' : geneLoading || (isHd && !geneValues) ? 'Loading…' : `0 – ${colorCeiling.toFixed(2)}`}</span></div><div className="h-3 w-48 rounded-full" style={{ background: gradientCss }} /><p className="mt-1 max-w-48 text-[10px] text-[#7d746c]">{hasManualMax ? 'Manual maximum' : '95th percentile of detected cells'} · Values above the maximum use the top color.</p></>
               ) : (
                 <div className="flex max-w-72 flex-wrap gap-x-4 gap-y-2">
                   {data.dataset.identities.map((identity) => <span key={identity} className="flex items-center gap-2 text-[13px] font-medium"><i className="size-3 rounded-full" style={{ background: getIdentityColor(identity) }} />{identity}</span>)}

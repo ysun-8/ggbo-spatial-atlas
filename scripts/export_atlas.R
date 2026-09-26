@@ -94,7 +94,10 @@ dir.create(file.path(output_root, 'data'), recursive = TRUE, showWarnings = FALS
 for (destination in names(image_sources)) {
   target <- file.path(output_root, sub('^/', '', destination))
   dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
-  if (!file.copy(image_sources[[destination]], target)) stop('Image copy failed')
+  if (endsWith(target, '.webp')) {
+    status <- system2(Sys.getenv('ATLAS_PYTHON', 'python3'), c('scripts/convert-histology.py', shQuote(image_sources[[destination]]), shQuote(target)))
+    if (status != 0L) stop('Lossless WebP conversion failed; ATLAS_PYTHON must have Pillow installed')
+  } else if (!file.copy(image_sources[[destination]], target)) stop('Image copy failed')
 }
 chunk_path <- file.path(output_root, 'data', paste0(id, '-genes'))
 dir.create(chunk_path, recursive = TRUE)
