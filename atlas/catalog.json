@@ -348,75 +348,6 @@
       }
     },
     {
-      "id": "hd-11972-baseline",
-      "label": "Visium HD \u00b7 UP-11972 \u00b7 baseline",
-      "path": "/data/hd-11972-baseline.json",
-      "name": "UP-11972 \u00b7 baseline",
-      "cohort": "FF Visium HD October 2025",
-      "kind": "hd",
-      "preparation": "fresh-frozen",
-      "study_group": "baseline",
-      "tissue_type": "gGBO",
-      "observation_label": "cell",
-      "annotation_field": "identity",
-      "embedding": "umap",
-      "expression": {
-        "assay": "SCT",
-        "layer": "data",
-        "encoding": "uint32-float32-v2",
-        "featured_genes": [
-          "CA9",
-          "VEGFA",
-          "MKI67",
-          "SOX2",
-          "OLIG2",
-          "GFAP",
-          "AIF1",
-          "COL1A1",
-          "CXCL8",
-          "EGFR",
-          "NES",
-          "VIM"
-        ]
-      },
-      "description": "gGBOs from UP-11972 at baseline (20% O2).",
-      "captures": [
-        {
-          "id": "hd-2025-a",
-          "label": "Capture A",
-          "image": "/hd-2025-a.webp",
-          "preview": "/hd-2025-a.preview.webp",
-          "width": 6000,
-          "height": 5332,
-          "marker_radius": 9,
-          "regions": [
-            {
-              "id": "slice1",
-              "label": "Region 1"
-            },
-            {
-              "id": "slice4",
-              "label": "Region 4"
-            },
-            {
-              "id": "slice5",
-              "label": "Region 5"
-            },
-            {
-              "id": "slice7",
-              "label": "Region 7"
-            }
-          ]
-        }
-      ],
-      "embedding_label": "SCT UMAP",
-      "navigation": {
-        "group": "hd-baseline",
-        "label": "Visium HD \u00b7 baseline",
-        "line": "UP-11972"
-      }
-    },
-    {
       "id": "hd-11789-baseline",
       "label": "Visium HD \u00b7 UP-11789 \u00b7 baseline",
       "path": "/data/hd-11789-baseline.json",
@@ -483,6 +414,75 @@
         "group": "hd-baseline",
         "label": "Visium HD \u00b7 baseline",
         "line": "UP-11789"
+      }
+    },
+    {
+      "id": "hd-11972-baseline",
+      "label": "Visium HD \u00b7 UP-11972 \u00b7 baseline",
+      "path": "/data/hd-11972-baseline.json",
+      "name": "UP-11972 \u00b7 baseline",
+      "cohort": "FF Visium HD October 2025",
+      "kind": "hd",
+      "preparation": "fresh-frozen",
+      "study_group": "baseline",
+      "tissue_type": "gGBO",
+      "observation_label": "cell",
+      "annotation_field": "identity",
+      "embedding": "umap",
+      "expression": {
+        "assay": "SCT",
+        "layer": "data",
+        "encoding": "uint32-float32-v2",
+        "featured_genes": [
+          "CA9",
+          "VEGFA",
+          "MKI67",
+          "SOX2",
+          "OLIG2",
+          "GFAP",
+          "AIF1",
+          "COL1A1",
+          "CXCL8",
+          "EGFR",
+          "NES",
+          "VIM"
+        ]
+      },
+      "description": "gGBOs from UP-11972 at baseline (20% O2).",
+      "captures": [
+        {
+          "id": "hd-2025-a",
+          "label": "Capture A",
+          "image": "/hd-2025-a.webp",
+          "preview": "/hd-2025-a.preview.webp",
+          "width": 6000,
+          "height": 5332,
+          "marker_radius": 9,
+          "regions": [
+            {
+              "id": "slice1",
+              "label": "Region 1"
+            },
+            {
+              "id": "slice4",
+              "label": "Region 4"
+            },
+            {
+              "id": "slice5",
+              "label": "Region 5"
+            },
+            {
+              "id": "slice7",
+              "label": "Region 7"
+            }
+          ]
+        }
+      ],
+      "embedding_label": "SCT UMAP",
+      "navigation": {
+        "group": "hd-baseline",
+        "label": "Visium HD \u00b7 baseline",
+        "line": "UP-11972"
       }
     },
     {
