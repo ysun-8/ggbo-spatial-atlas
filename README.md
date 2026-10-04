@@ -54,4 +54,4 @@ Please report problems or ask questions through [GitHub issues](https://github.c
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT.
