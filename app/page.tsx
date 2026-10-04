@@ -74,28 +74,36 @@ type VisiumData = {
   spots: Spot[];
 };
 
+// Zone and tumor-state colors are sampled from manuscript Figure 2 (B, G, H, I).
+// Other cell types avoid red, blue, and green so they don't read as zones.
 const identityColors: Record<string, string> = {
-  OPZ: '#45b8ac',
-  IQZ: '#ef9d3c',
-  HCZ: '#d34f73',
-  IR: '#7868d8',
-  'CAR-T': '#2c7fb8',
-  'M1 myeloid': '#458b74',
-  perivascular: '#6f9847',
-  endothelial: '#3b8f9c',
+  OPZ: '#d90017',
+  IQZ: '#2c69a8',
+  HCZ: '#40a23a',
+  'proliferating tumor': '#ee5e52',
+  'RG-like': '#5a95cf',
+  'hypoxic niche': '#4eb05c',
+  IR: '#8e5bb5',
+  'IR tumor 1': '#8e5bb5',
+  'IR tumor 2': '#c495d6',
+  'IFN-response tumor': '#8e5bb5',
+  'cytokine-response tumor': '#b07aa1',
   'IFN-response': '#b07aa1',
-  Myeloid: '#8c6d31',
-  myeloid: '#2c7fb8',
-  'myeloid 1': '#2c7fb8',
-  'myeloid 2': '#7868d8',
-  'hypoxic niche': '#d34f73',
-  'necrotic core': '#7f6557',
-  'proliferating tumor': '#ef9d3c',
-  'RG-like': '#45b8ac',
-  oligo: '#859a41',
-  stroma: '#aa74a4',
-  hemorrhage: '#ac443d',
-  'hemorrhage/debris': '#ac443d',
+  'CAR-T': '#e6a100',
+  myeloid: '#e07b25',
+  Myeloid: '#e07b25',
+  'myeloid 1': '#e07b25',
+  'myeloid 2': '#a0522d',
+  'myeloid/stromal': '#e07b25',
+  'M1 myeloid': '#e07b25',
+  endothelial: '#16a3b0',
+  perivascular: '#9c7c38',
+  oligo: '#c9b11a',
+  stroma: '#8c564b',
+  'CAF-stroma': '#8c564b',
+  'necrotic core': '#5b4636',
+  hemorrhage: '#7a3b52',
+  'hemorrhage/debris': '#7a3b52',
 };
 
 const identityNames: Record<string, string> = {
@@ -107,7 +115,9 @@ const identityNames: Record<string, string> = {
   'IR tumor 2': 'Immune-responsive tumor 2',
 };
 
-const fallbackIdentityColors = ['#4d908e', '#f8961e', '#b56576', '#577590', '#8f6bb3'];
+const fallbackIdentityColors = ['#e07b25', '#8e5bb5', '#16a3b0', '#8c564b', '#c9b11a'];
+// Cells with no detected expression stay neutral so expressing cells stand out.
+const notDetectedColor = 'rgba(150, 150, 150, 0.4)';
 const minZoom = 0.8;
 const regularMaxZoom = 3;
 const hdMaxZoom = 20;
@@ -128,9 +138,15 @@ if (catalog.schema_version !== 2 || !datasetOptions.length || new Set(datasetOpt
 
 const gradientOptions = [
   {
-    id: 'seurat',
-    label: 'Seurat-style',
-    stops: ['#3b4cc0', '#2f7fbc', '#35b7b0', '#7ad151', '#fde725', '#f98e09', '#d7191c'],
+    id: 'viridis',
+    label: 'Viridis',
+    stops: ['#440154', '#3b528b', '#21918c', '#5ec962', '#fde725'],
+  },
+  {
+    // Grey to magenta, as in manuscript Figure 2H.
+    id: 'figure',
+    label: 'Figure 2H',
+    stops: ['#d3d3d3', '#b4209d'],
   },
   {
     id: 'magma',
@@ -138,9 +154,9 @@ const gradientOptions = [
     stops: ['#1c1936', '#4a2d82', '#c13575', '#f18345', '#fae766'],
   },
   {
-    id: 'viridis',
-    label: 'Viridis',
-    stops: ['#440154', '#3b528b', '#21918c', '#5ec962', '#fde725'],
+    id: 'seurat',
+    label: 'Seurat-style',
+    stops: ['#3b4cc0', '#2f7fbc', '#35b7b0', '#7ad151', '#fde725', '#f98e09', '#d7191c'],
   },
 ] as const;
 
@@ -410,15 +426,26 @@ export default function Home() {
 
   const colorValues = displayMode === 'gene' ? geneValues : null;
   const activeCeiling = displayMode === 'gene' ? colorCeiling : 0;
+  const expressionOf = useCallback((spot: Spot) => (data?.dataset.gene_data_path && spot.index !== undefined
+    ? colorValues?.[spot.index] ?? 0
+    : spot.expression?.[selectedGene] ?? 0), [data, colorValues, selectedGene]);
+  const geneColorsReady = displayMode === 'gene' && !(data?.dataset.gene_data_path && !colorValues);
+
   const spotColors = useMemo(() => new Map(filteredSpots.map((spot) => {
     if (displayMode === 'identity') return [spot.id, getIdentityColor(spot.identity)] as const;
-    if (data?.dataset.gene_data_path && !colorValues) return [spot.id, '#b5b5b5'] as const;
-    const ceiling = activeCeiling || 1;
-    const value = data?.dataset.gene_data_path && spot.index !== undefined
-      ? colorValues?.[spot.index] ?? 0
-      : spot.expression?.[selectedGene] ?? 0;
-    return [spot.id, interpolateColor(value / ceiling, gradientId)] as const;
-  })), [filteredSpots, displayMode, getIdentityColor, activeCeiling, data, colorValues, selectedGene, gradientId]);
+    if (!geneColorsReady) return [spot.id, '#b5b5b5'] as const;
+    const value = expressionOf(spot);
+    if (!(value > 0)) return [spot.id, notDetectedColor] as const;
+    return [spot.id, interpolateColor(value / (activeCeiling || 1), gradientId)] as const;
+  })), [filteredSpots, displayMode, getIdentityColor, geneColorsReady, expressionOf, activeCeiling, gradientId]);
+
+  // In gene mode, draw low expression first so the highest-expressing cells sit on top.
+  const drawnSpots = useMemo(() => {
+    if (!geneColorsReady) return filteredSpots;
+    return filteredSpots.map((spot) => ({ spot, value: expressionOf(spot) }))
+      .sort((a, b) => a.value - b.value)
+      .map(({ spot }) => spot);
+  }, [filteredSpots, geneColorsReady, expressionOf]);
 
   const getSelectedExpression = (spot: Spot) => {
     if (data?.dataset.gene_data_path && spot.index !== undefined) return geneValues?.[spot.index] ?? null;
@@ -584,10 +611,10 @@ export default function Home() {
   const gradientCss = `linear-gradient(90deg, ${activeGradient.stops.join(', ')})`;
 
   const useCanvas = isHd;
-  const umapPoints = useMemo(() => !useCanvas || !umapBounds ? [] : filteredSpots.map((spot) => ({
+  const umapPoints = useMemo(() => !useCanvas || !umapBounds ? [] : drawnSpots.map((spot) => ({
     id: spot.id, x: 14 + ((spot.umap_x - umapBounds.minX) / (umapBounds.maxX - umapBounds.minX || 1)) * 212,
     y: 166 - ((spot.umap_y - umapBounds.minY) / (umapBounds.maxY - umapBounds.minY || 1)) * 152,
-  })), [useCanvas, umapBounds, filteredSpots]);
+  })), [useCanvas, umapBounds, drawnSpots]);
 
   // Camera and search updates reuse these dense layers without rebuilding points.
   const spatialPanel = useMemo(() => {
@@ -599,7 +626,7 @@ export default function Home() {
           <image key={tissueImage} href={tissueImage} width={imageWidth} height={imageHeight} />
         </g>
         <g>
-          {filteredSpots.map((spot) => {
+          {drawnSpots.map((spot) => {
             const isSelected = selectedSpot?.id === spot.id;
             return (
               <circle key={spot.id} data-spot-id={spot.id} cx={spot.x} cy={spot.y} r={isSelected ? selectedPointRadius : pointRadius} fill={spotColors.get(spot.id)} fillOpacity={spotOpacity / 100} stroke={isSelected ? '#fff' : (isHd ? 'transparent' : 'rgba(24,18,26,0.38)')} strokeWidth={isSelected ? (isHd ? 0.9 : 4) : (isHd ? 2 : 1.2)} vectorEffect="non-scaling-stroke" className={isHd ? 'cursor-pointer' : 'cursor-pointer transition-[r,stroke-width] hover:stroke-white'} />
@@ -608,7 +635,7 @@ export default function Home() {
         </g>
       </g>
     );
-  }, [useCanvas, imageWidth, imageHeight, tissueImage, previewImage, imageOpacity, filteredSpots, selectedSpot, selectedPointRadius, pointRadius, spotColors, spotOpacity, isHd]);
+  }, [useCanvas, imageWidth, imageHeight, tissueImage, previewImage, imageOpacity, drawnSpots, selectedSpot, selectedPointRadius, pointRadius, spotColors, spotOpacity, isHd]);
 
   const umapPanel = useMemo(() => useCanvas ? (
     <AtlasPointCanvas points={umapPoints} colors={spotColors} viewBox="0 0 240 180" radius={1} opacity={0.76}
@@ -616,14 +643,14 @@ export default function Home() {
       onSelect={(id) => { const spot = filteredSpots.find((point) => point.id === id); if (spot) setSelectedSpot(spot); }} />
   ) : (
     <svg viewBox="0 0 240 180" className="w-full rounded-md bg-ground" aria-label={`UMAP of visible Visium ${observationPlural}`} shapeRendering="geometricPrecision">
-      {umapBounds && filteredSpots.map((spot) => {
+      {umapBounds && drawnSpots.map((spot) => {
         const x = 14 + ((spot.umap_x - umapBounds.minX) / (umapBounds.maxX - umapBounds.minX || 1)) * 212;
         const y = 166 - ((spot.umap_y - umapBounds.minY) / (umapBounds.maxY - umapBounds.minY || 1)) * 152;
         const isSelected = selectedSpot?.id === spot.id;
         return <circle key={spot.id} cx={x} cy={y} r={isSelected ? (isHd ? 3.2 : 4.5) : (isHd ? 1 : 1.8)} fill={spotColors.get(spot.id)} opacity={isSelected ? 1 : 0.76} stroke={isSelected ? '#fff' : 'none'} strokeWidth={isHd ? 1.2 : 2} vectorEffect="non-scaling-stroke" onClick={() => setSelectedSpot(spot)} className="cursor-pointer" />;
       })}
     </svg>
-  ), [useCanvas, umapPoints, observationPlural, umapBounds, filteredSpots, selectedSpot, isHd, spotColors, setSelectedSpot]);
+  ), [useCanvas, umapPoints, observationPlural, umapBounds, drawnSpots, filteredSpots, selectedSpot, isHd, spotColors, setSelectedSpot]);
 
   const viewLabel = `${selectedEntry.navigation.label}${selectedEntry.navigation.line ? ` · ${selectedEntry.navigation.line}` : ''}`;
 
@@ -812,7 +839,7 @@ export default function Home() {
               {imageStatus === 'error' ? <><span>Histology unavailable or image dimensions do not match.</span> <button className="underline underline-offset-2" onClick={() => setImageRetry((value) => value + 1)}>Retry image</button></> : 'Loading full-resolution histology…'}
             </output>}
             <div ref={spatialViewport} className="absolute inset-2">
-              {useCanvas ? <AtlasPointCanvas key={imageKey} points={filteredSpots} colors={spotColors} viewBox={spatialViewBox}
+              {useCanvas ? <AtlasPointCanvas key={imageKey} points={drawnSpots} colors={spotColors} viewBox={spatialViewBox}
                 radius={pointRadius} opacity={spotOpacity / 100} selectedId={selectedSpot?.id}
                 onKeyboardSelect={(id) => { const spot = filteredSpots.find((point) => point.id === id); if (spot) setSelectedSpot(spot); }}
                 label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} className="size-full"
@@ -830,7 +857,8 @@ export default function Home() {
                   </figcaption>
                   <div className="mt-2 h-2 w-52 max-w-full rounded-[2px]" style={{ background: gradientCss }} />
                   <div className="mt-1 flex justify-between font-mono text-[11px] tabular-nums text-ink-2"><span>0</span><span>{geneLoading || (isHd && !geneValues) ? '–' : `${colorCeiling.toFixed(2)}${hasManualMax ? '' : ' (P95)'}`}</span></div>
-                  <p className="mt-1.5 max-w-52 text-[11px] leading-4 text-ink-3">{hasManualMax ? 'Manual maximum.' : '95th percentile of expressing cells.'} Higher values use the top color.</p>
+                  <p className="mt-1.5 flex max-w-52 items-center gap-1.5 text-[11px] leading-4 text-ink-3"><i className="size-2 shrink-0 rounded-full" style={{ background: notDetectedColor }} aria-hidden="true" />Not detected</p>
+                  <p className="mt-1 max-w-52 text-[11px] leading-4 text-ink-3">{hasManualMax ? 'Manual maximum.' : '95th percentile of expressing cells.'} Higher values use the top color and are drawn on top.</p>
                 </>
               ) : (
                 <ul className="grid gap-1.5" aria-label="Identity legend">
@@ -863,7 +891,6 @@ export default function Home() {
                   <div className="min-w-0">
                     <p className="text-base font-semibold leading-5">{selectedSpot.identity}</p>
                     {identityNames[selectedSpot.identity] && <p className="text-xs text-ink-3">{identityNames[selectedSpot.identity]}</p>}
-                    <p className="mt-1 truncate font-mono text-[11px] text-ink-3" title={selectedSpot.barcode}>{selectedSpot.barcode}</p>
                   </div>
                 </div>
                 <dl className="grid grid-cols-2 gap-x-4 border-t border-rule text-sm">
