@@ -7,8 +7,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-plex-sans);
-  --font-mono: var(--font-plex-mono);
+  --font-sans: var(--font-public-sans);
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --font-heading: var(--font-sans);
   --color-ground: var(--atlas-ground);
   --color-panel: var(--atlas-panel);
@@ -58,7 +58,7 @@
 }
 
 body {
-  font-family: var(--font-plex-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-public-sans), Arial, Helvetica, sans-serif;
 }
 
 :root {

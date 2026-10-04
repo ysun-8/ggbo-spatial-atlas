@@ -681,7 +681,7 @@ export default function Home() {
         <div className="flex min-w-0 items-center gap-3">
           <ZoneMark className="size-8 shrink-0" />
           <div className="min-w-0">
-            <h1 className="text-[15px] font-semibold leading-5 tracking-[-0.01em]">{catalog.site.title}</h1>
+            <h1 className="text-[17px] font-semibold leading-6 tracking-[-0.01em]">{catalog.site.title}</h1>
             <p className="truncate text-xs leading-4 text-ink-3">{viewLabel}</p>
           </div>
         </div>
@@ -757,7 +757,7 @@ export default function Home() {
           <div className="space-y-2 px-4 py-3.5">
             <div className="flex items-baseline justify-between gap-2">
               <label className="control-label" htmlFor="gene-search">Gene</label>
-              <span className="text-[11px] tabular-nums text-ink-3">{formatNumber(data.genes.length)} genes</span>
+              <span className="text-xs tabular-nums text-ink-3">{formatNumber(data.genes.length)} genes</span>
             </div>
             <div className="flex h-8 items-center gap-2 rounded-md border border-rule-strong bg-white px-2.5 focus-within:border-plum focus-within:ring-2 focus-within:ring-plum/15">
               <Search className="size-3.5 shrink-0 text-ink-3" aria-hidden="true" />
@@ -775,7 +775,7 @@ export default function Home() {
             </div>
             {geneNotice && <output className="block text-xs text-plum">{geneNotice}</output>}
             {geneError && <div role="alert" className="text-xs text-plum">Expression unavailable. <button className="underline underline-offset-2" onClick={() => setGeneRetry((value) => value + 1)}>Retry</button></div>}
-            {matchingGenes.length > visibleGenes.length && <p className="text-[11px] text-ink-3">{search ? `Showing ${visibleGenes.length} of ${formatNumber(matchingGenes.length)} matches.` : 'Type to search all genes.'}</p>}
+            {matchingGenes.length > visibleGenes.length && <p className="text-xs text-ink-3">{search ? `Showing ${visibleGenes.length} of ${formatNumber(matchingGenes.length)} matches.` : 'Type to search all genes.'}</p>}
           </div>
 
           {displayMode === 'gene' && <div className="space-y-3 px-4 py-3.5">
@@ -797,7 +797,7 @@ export default function Home() {
                 className="h-8 w-full rounded-md border border-rule-strong bg-white px-2.5 text-sm tabular-nums outline-none placeholder:text-ink-3 focus:border-plum focus:ring-2 focus:ring-plum/15" />
               {manualMax && !hasManualMax
                 ? <p className="text-xs text-plum" role="alert">Enter a positive number. Automatic scaling is on.</p>
-                : <p className="text-[11px] leading-4 text-ink-3">Leave blank for automatic scaling. Enter the same maximum to compare samples. Values are {data.dataset.expression.assay}/{data.dataset.expression.layer}.</p>}
+                : <p className="text-xs leading-4 text-ink-3">Leave blank for automatic scaling. Enter the same maximum to compare samples. Values are {data.dataset.expression.assay}/{data.dataset.expression.layer}.</p>}
             </div>
           </div>}
 
@@ -816,7 +816,7 @@ export default function Home() {
             </div>
             <div className="flex items-center rounded-md border border-rule-strong bg-panel">
               <Button variant="ghost" size="icon-sm" aria-label="Zoom out" onClick={() => zoomAtCenter(isHd ? camera.scale / 1.25 : camera.scale - 0.2)}><Minus /></Button>
-              <span className="w-11 text-center text-[11px] font-medium tabular-nums text-ink-2">{Math.round(camera.scale * 100)}%</span>
+              <span className="w-11 text-center text-xs font-medium tabular-nums text-ink-2">{Math.round(camera.scale * 100)}%</span>
               <Button variant="ghost" size="icon-sm" aria-label="Zoom in" onClick={() => zoomAtCenter(isHd ? camera.scale * 1.25 : camera.scale + 0.2)}><Plus /></Button>
               <span className="h-4 w-px bg-rule" aria-hidden="true" />
               <Button variant="ghost" size="icon-sm" aria-label="Reset view" onClick={() => setCamera({ x: 0, y: 0, scale: 1 })}><RotateCcw /></Button>
@@ -849,11 +849,11 @@ export default function Home() {
                 <>
                   <figcaption className="flex items-baseline justify-between gap-6 text-[13px]">
                     <span className="gene font-medium">{selectedGene}</span>
-                    <span className="text-[11px] text-ink-3">{geneError ? 'Unavailable' : geneLoading || (isHd && !geneValues) ? 'Loading…' : `${data.dataset.expression.assay}/${data.dataset.expression.layer}`}</span>
+                    <span className="text-xs text-ink-3">{geneError ? 'Unavailable' : geneLoading || (isHd && !geneValues) ? 'Loading…' : `${data.dataset.expression.assay}/${data.dataset.expression.layer}`}</span>
                   </figcaption>
                   <div className="mt-2 h-2 w-52 max-w-full rounded-[2px]" style={{ background: gradientCss }} />
-                  <div className="mt-1 flex justify-between font-mono text-[11px] tabular-nums text-ink-2"><span>0</span><span>{geneLoading || (isHd && !geneValues) ? '–' : `${colorCeiling.toFixed(2)}${hasManualMax ? '' : ' (P95)'}`}</span></div>
-                  <p className="mt-1.5 max-w-52 text-[11px] leading-4 text-ink-3">{hasManualMax ? 'Manual maximum.' : '95th percentile of expressing cells.'} Higher values use the top color and are drawn on top.</p>
+                  <div className="mt-1 flex justify-between font-mono text-xs tabular-nums text-ink-2"><span>0</span><span>{geneLoading || (isHd && !geneValues) ? '–' : `${colorCeiling.toFixed(2)}${hasManualMax ? '' : ' (P95)'}`}</span></div>
+                  <p className="mt-1.5 max-w-52 text-xs leading-4 text-ink-3">{hasManualMax ? 'Manual maximum.' : '95th percentile of expressing cells.'} Higher values use the top color and are drawn on top.</p>
                 </>
               ) : (
                 <ul className="grid gap-1.5" aria-label="Identity legend">
@@ -867,18 +867,18 @@ export default function Home() {
                 </ul>
               )}
             </figure>
-            <p className="pointer-events-none absolute right-3 top-3 hidden rounded-md bg-panel/90 px-2 py-1 text-[11px] text-ink-2 sm:block">{formatNumber(filteredSpots.length)} {observationPlural} · drag to pan, scroll to zoom</p>
+            <p className="pointer-events-none absolute right-3 top-3 hidden rounded-md bg-panel/90 px-2 py-1 text-xs text-ink-2 sm:block">{formatNumber(filteredSpots.length)} {observationPlural} · drag to pan, scroll to zoom</p>
           </div>
         </section>
 
         <aside className="divide-y divide-rule border-t border-rule bg-panel [grid-area:side] xl:min-h-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">
           <section className="px-4 py-3.5" aria-labelledby="umap-heading">
-            <div className="mb-2 flex items-baseline justify-between gap-2"><h2 id="umap-heading" className="text-[13px] font-semibold">Linked UMAP</h2><span className="text-[11px] text-ink-3">{data.dataset.embedding_label}</span></div>
+            <div className="mb-2 flex items-baseline justify-between gap-2"><h2 id="umap-heading" className="text-sm font-semibold">Linked UMAP</h2><span className="text-xs text-ink-3">{data.dataset.embedding_label}</span></div>
             {umapPanel}
           </section>
 
           <section className="px-4 py-3.5" aria-labelledby="inspector-heading">
-            <h2 id="inspector-heading" className="mb-2 text-[13px] font-semibold">Selected {observationSingular}</h2>
+            <h2 id="inspector-heading" className="mb-2 text-sm font-semibold">Selected {observationSingular}</h2>
             {selectedSpot ? (
               <div className="space-y-3">
                 <div className="flex items-start gap-2.5">
@@ -917,9 +917,9 @@ export default function Home() {
           </section>
 
           <section className="px-4 py-3.5" aria-labelledby="dataset-heading">
-            <h2 id="dataset-heading" className="mb-1.5 text-[13px] font-semibold">About this dataset</h2>
+            <h2 id="dataset-heading" className="mb-1.5 text-sm font-semibold">About this dataset</h2>
             <p className="text-[13px] leading-5 text-ink-2">{data.dataset.description}</p>
-            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px] leading-4">
+            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs leading-4">
               <dt className="text-ink-3">Cohort</dt><dd className="text-ink-2">{data.dataset.cohort}</dd>
               <dt className="text-ink-3">{isHd ? 'Cells' : 'Spots'}</dt><dd className="tabular-nums text-ink-2">{formatNumber(data.dataset.spot_count)}</dd>
               {data.dataset.source_object && <><dt className="text-ink-3">Source</dt><dd className="break-all font-mono text-ink-2">{data.dataset.source_object}</dd></>}
@@ -963,7 +963,7 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor: string; c
 
 function OpacitySlider({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
   return (
-    <label className="grid grid-cols-[auto_72px_30px] items-center gap-2 text-[11px] font-medium text-ink-2">
+    <label className="grid grid-cols-[auto_72px_30px] items-center gap-2 text-xs font-medium text-ink-2">
       <span>{label}</span>
       <input className="atlas-range" type="range" min="10" max="100" value={value} aria-label={`${label} opacity`} onChange={(event) => onChange(Number(event.target.value))} />
       <span className="text-right tabular-nums">{value}%</span>
@@ -974,7 +974,7 @@ function OpacitySlider({ label, value, onChange }: { label: string; value: numbe
 function Reading({ label, value, accent = false }: { label: React.ReactNode; value: string; accent?: boolean }) {
   return (
     <div className="border-b border-rule py-1.5">
-      <dt className="text-[11px] text-ink-3">{label}</dt>
+      <dt className="text-xs text-ink-3">{label}</dt>
       <dd className={`font-medium tabular-nums ${accent ? 'text-plum' : ''}`}>{value}</dd>
     </div>
   );
