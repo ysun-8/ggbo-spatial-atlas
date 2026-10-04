@@ -1,17 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  CircleDot,
-  Crosshair,
-  Dna,
-  ImageIcon,
-  Minus,
-  Plus,
-  RotateCcw,
-  Search,
-  SlidersHorizontal,
-} from 'lucide-react';
+import { Link2, Minus, Plus, RotateCcw, Search } from 'lucide-react';
 
 import { detectedCeiling, readView, writeView, assetPath, pinchCamera } from '@/lib/atlas-display.mjs';
 import { AtlasPointCanvas } from '@/components/atlas-point-canvas';
@@ -599,10 +589,10 @@ export default function Home() {
 
   const umapPanel = useMemo(() => useCanvas ? (
     <AtlasPointCanvas points={umapPoints} colors={spotColors} viewBox="0 0 240 180" radius={1} opacity={0.76}
-      selectedId={selectedSpot?.id} label={`UMAP of visible Visium ${observationPlural}`} className="w-full aspect-[4/3] rounded-lg bg-[#f5f2ed]"
+      selectedId={selectedSpot?.id} label={`UMAP of visible Visium ${observationPlural}`} className="w-full aspect-[4/3] rounded-md bg-ground"
       onSelect={(id) => { const spot = filteredSpots.find((point) => point.id === id); if (spot) setSelectedSpot(spot); }} />
   ) : (
-    <svg viewBox="0 0 240 180" className="w-full rounded-lg bg-[#f5f2ed]" aria-label={`UMAP of visible Visium ${observationPlural}`} shapeRendering="geometricPrecision">
+    <svg viewBox="0 0 240 180" className="w-full rounded-md bg-ground" aria-label={`UMAP of visible Visium ${observationPlural}`} shapeRendering="geometricPrecision">
       {umapBounds && filteredSpots.map((spot) => {
         const x = 14 + ((spot.umap_x - umapBounds.minX) / (umapBounds.maxX - umapBounds.minX || 1)) * 212;
         const y = 166 - ((spot.umap_y - umapBounds.minY) / (umapBounds.maxY - umapBounds.minY || 1)) * 152;
@@ -612,54 +602,58 @@ export default function Home() {
     </svg>
   ), [useCanvas, umapPoints, observationPlural, umapBounds, filteredSpots, selectedSpot, isHd, spotColors, setSelectedSpot]);
 
+  const viewLabel = `${selectedEntry.navigation.label}${selectedEntry.navigation.line ? ` · ${selectedEntry.navigation.line}` : ''}`;
+
   if (!data) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f4f1ec] text-[#22201d]">
-        <div className="flex items-center gap-3 rounded-xl border border-black/10 bg-white px-5 py-4 shadow-sm">
-          <CircleDot className="size-5 animate-pulse text-[#9c3f68]" />
-          {datasetError ? <div role="alert"><p className="text-sm font-medium">Unable to load this dataset.</p><Button className="mt-2" onClick={() => setRetry((value) => value + 1)}>Retry</Button></div> : <span className="text-sm font-medium">Loading spatial run…</span>}
+      <main className="grid min-h-screen place-items-center bg-ground px-6 text-ink">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <ZoneMark className={`size-10 ${datasetError ? '' : 'animate-pulse'}`} />
+          {datasetError ? (
+            <div role="alert" className="space-y-3">
+              <p className="text-sm font-medium">Unable to load {viewLabel}.</p>
+              <Button onClick={() => setRetry((value) => value + 1)}>Retry</Button>
+            </div>
+          ) : (
+            <p className="text-sm text-ink-2" aria-live="polite">Loading {viewLabel}…</p>
+          )}
         </div>
       </main>
     );
   }
 
+  const lineLabel = data.dataset.tissue_type === 'gGBO' ? 'GBO line' : 'Sample';
+  const legendIdentities = data.dataset.identities
+    .map((identity, index) => ({ identity, index }))
+    .sort((a, b) => zoneRank(a.identity) - zoneRank(b.identity) || a.index - b.index)
+    .map(({ identity }) => identity);
+  const selectedValue = selectedSpot ? (geneLoading ? null : getSelectedExpression(selectedSpot)) : null;
+
   return (
-    <main className="min-h-screen bg-[#f3f0ea] text-[#201e1b]">
-      <header className="flex min-h-14 flex-wrap gap-2 items-center justify-between border-b border-[#d7d0c5] bg-[#fbfaf7] px-4 py-2 lg:px-6">
-        <div className="flex items-center gap-3">
-          <div className="grid size-9 place-items-center rounded-xl bg-[#351d4a] text-white shadow-sm">
-            <Dna className="size-5" />
-          </div>
-          <div>
-            <h1 className="text-[17px] font-semibold tracking-tight">{catalog.site.title}</h1>
-            <p className="text-[11px] text-[#7e746a]">{data.dataset.cohort} · {data.dataset.name}</p>
+    <main className="flex min-h-screen flex-col bg-ground text-ink xl:h-screen">
+      <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-rule bg-panel px-4 py-2.5 lg:px-5">
+        <div className="flex min-w-0 items-center gap-3">
+          <ZoneMark className="size-8 shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-[15px] font-semibold leading-5 tracking-[-0.01em]">{catalog.site.title}</h1>
+            <p className="truncate text-xs leading-4 text-ink-3">{viewLabel}</p>
           </div>
         </div>
-        <div className="ml-auto flex items-center gap-3 text-xs">
-          <a className="underline underline-offset-2" href={publicPath('/about.html')} target="_blank" rel="noreferrer">Methods &amp; source</a>
-          <button className="rounded-lg border border-[#d7d0c5] bg-white px-3 py-2" onClick={async () => {
+        <div className="ml-auto flex items-center gap-4 text-xs">
+          <span className="hidden tabular-nums text-ink-2 md:inline">{formatNumber(data.dataset.spot_count)} {observationPlural}</span>
+          <a className="text-ink underline decoration-rule-strong underline-offset-[3px] hover:decoration-plum" href={publicPath('/about.html')} target="_blank" rel="noreferrer">Methods &amp; source</a>
+          <button className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rule-strong bg-white px-2.5 font-medium text-ink transition-colors hover:border-ink-3" onClick={async () => {
             try { await navigator.clipboard.writeText(window.location.href); setShareStatus('Link copied'); }
             catch { setShareStatus('Copy from address bar'); }
             window.setTimeout(() => setShareStatus('Copy link'), 3000);
-          }}>{shareStatus}</button>
-        </div>
-        <div className="hidden items-center gap-2 text-xs text-[#625b54] sm:flex">
-          <span className="rounded-full border border-[#d7d0c5] bg-white px-3 py-1.5">{isHd ? 'Visium HD' : 'Regular Visium'}</span>
-          <span className="rounded-full border border-[#d7d0c5] bg-white px-3 py-1.5">{formatNumber(data.dataset.spot_count)} {observationPlural}</span>
+          }}><Link2 className="size-3.5 text-ink-3" aria-hidden="true" /><span aria-live="polite">{shareStatus}</span></button>
         </div>
       </header>
 
-      <div className="grid min-h-[calc(100vh-57px)] grid-cols-1 xl:h-[calc(100vh-57px)] xl:min-h-0 xl:grid-cols-[240px_minmax(520px,1fr)_280px] xl:overflow-hidden">
-        <aside className="border-b border-[#d7d0c5] bg-[#fbfaf7] p-3 xl:overflow-y-auto xl:border-b-0 xl:border-r">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <SlidersHorizontal className="size-4 text-[#8f315d]" />
-              Explore
-            </div>
-          </div>
-
-          <section className="space-y-1.5">
-            <label className="control-label" htmlFor="dataset-group">Dataset</label>
+      {/* Phones see the tissue right after the dataset choice; wide screens get three columns. */}
+      <div className="grid flex-1 grid-cols-1 [grid-template-areas:'data'_'view'_'color'_'side'] xl:min-h-0 xl:grid-cols-[264px_minmax(520px,1fr)_288px] xl:grid-rows-[auto_minmax(0,1fr)] xl:[grid-template-areas:'data_view_side'_'color_view_side']">
+        <section aria-label="Dataset" className="grid gap-3 border-b border-rule bg-panel px-4 py-3.5 [grid-area:data] sm:grid-cols-2 xl:grid-cols-1 xl:border-r">
+          <Field label="Dataset" htmlFor="dataset-group">
             <NativeSelect id="dataset-group" className="w-full bg-white" value={selectedEntry.navigation.group} onChange={(event) => selectGroup(event.target.value)}>
               <optgroup label="Visium">
                 {datasetGroups.filter((group) => !group.id.startsWith('hd-')).map((group) => <option key={group.id} value={group.id}>{group.label.replace('Visium · ', '')}</option>)}
@@ -668,18 +662,16 @@ export default function Home() {
                 {datasetGroups.filter((group) => group.id.startsWith('hd-')).map((group) => <option key={group.id} value={group.id}>{group.label}</option>)}
               </optgroup>
             </NativeSelect>
-          </section>
+          </Field>
 
-          {isHd && <section className="mt-3.5 space-y-1.5">
-            <label className="control-label" htmlFor="hd-line">{data.dataset.tissue_type === 'gGBO' ? 'GBO line' : 'Sample'}</label>
+          {isHd && <Field label={lineLabel} htmlFor="hd-line">
             <NativeSelect id="hd-line" className="w-full bg-white" value={datasetId} onChange={(event) => setDatasetId(event.target.value)}>
               {groupEntries.map((entry) => <option key={entry.id} value={entry.id}>{entry.navigation.line}</option>)}
             </NativeSelect>
-          </section>}
+          </Field>}
 
           {data.dataset.captures.length > 1 && (
-            <section className="mt-3.5 space-y-1.5">
-              <label className="control-label" htmlFor="capture-area">Capture area</label>
+            <Field label="Capture area" htmlFor="capture-area">
               <NativeSelect id="capture-area" className="w-full bg-white" value={activeCapture?.id} onChange={(event) => {
                 setSelectedCaptureId(event.target.value); setLineFilter('all'); setSelectedSpot(null);
                 if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
@@ -688,112 +680,112 @@ export default function Home() {
               }}>
                 {data.dataset.captures.map((capture) => <option key={capture.id} value={capture.id}>{capture.label.replaceAll('UP-', '')}</option>)}
               </NativeSelect>
-            </section>
+            </Field>
           )}
-          {!isHd && <section className="mt-3.5 space-y-1.5">
-            <p className="control-label">{data.dataset.tissue_type === 'gGBO' ? 'GBO line' : 'Sample'}</p>
+
+          {!isHd && <fieldset className="m-0 min-w-0 space-y-1.5 border-0 p-0 sm:col-span-2 xl:col-span-1">
+            <legend className="control-label mb-1.5">{lineLabel}</legend>
             <div className="flex flex-wrap gap-1.5">
               {(data.dataset.lines.length === 1 ? data.dataset.lines : ['all', ...data.dataset.lines]).map((line) => (
-                <Button key={line} variant={lineFilter === line ? 'default' : 'outline'} size="sm" className={lineFilter === line ? 'bg-[#351d4a] hover:bg-[#351d4a]/90' : 'bg-white'} onClick={() => { setLineFilter(line); setSelectedSpot(null); }}>
+                <button key={line} className={toggleClass(lineFilter === line)} aria-pressed={lineFilter === line} onClick={() => { setLineFilter(line); setSelectedSpot(null); }}>
                   {line === 'all' ? 'All' : data.dataset.tissue_type === 'gGBO' ? formatGboLine(line) : line}
-                </Button>
+                </button>
               ))}
             </div>
-          </section>}
+          </fieldset>}
+        </section>
 
-          <section className="mt-3.5 space-y-1.5">
-            <p className="control-label">Color {observationPlural} by</p>
-            <div className="grid grid-cols-2 rounded-xl bg-[#ede8e0] p-1">
-              <Button variant="ghost" size="sm" className={displayMode === 'gene' ? 'bg-white text-[#57234a] shadow-sm hover:bg-white' : 'text-[#776f67]'} onClick={() => setDisplayMode('gene')}>Gene</Button>
-              <Button variant="ghost" size="sm" className={displayMode === 'identity' ? 'bg-white text-[#57234a] shadow-sm hover:bg-white' : 'text-[#776f67]'} onClick={() => setDisplayMode('identity')}>Identity</Button>
+        <section aria-label="Display" className="divide-y divide-rule border-b border-rule bg-panel [grid-area:color] xl:min-h-0 xl:overflow-y-auto xl:border-r xl:border-b-0">
+          <fieldset className="m-0 min-w-0 border-0 px-4 py-3.5">
+            <legend className="control-label float-left mb-1.5 w-full">Color {observationPlural} by</legend>
+            <div className="clear-left grid grid-cols-2 gap-0.5 rounded-lg bg-ground p-0.5">
+              {(['gene', 'identity'] as const).map((mode) => (
+                <button key={mode} aria-pressed={displayMode === mode} onClick={() => setDisplayMode(mode)}
+                  className={`h-7 rounded-md text-[13px] font-medium transition-colors ${displayMode === mode ? 'bg-white text-plum shadow-[0_1px_2px_rgba(29,26,24,0.12)]' : 'text-ink-2 hover:text-ink'}`}>
+                  {mode === 'gene' ? 'Gene' : 'Identity'}
+                </button>
+              ))}
             </div>
-          </section>
+          </fieldset>
 
-          {displayMode === 'gene' && (
-            <section className="mt-3.5 space-y-1.5">
-              <p className="control-label">Expression gradient</p>
-              <div className="grid gap-1.5">
+          <div className="space-y-2 px-4 py-3.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <label className="control-label" htmlFor="gene-search">Gene</label>
+              <span className="text-[11px] tabular-nums text-ink-3">{formatNumber(data.genes.length)} genes</span>
+            </div>
+            <div className="flex h-8 items-center gap-2 rounded-md border border-rule-strong bg-white px-2.5 focus-within:border-plum focus-within:ring-2 focus-within:ring-plum/15">
+              <Search className="size-3.5 shrink-0 text-ink-3" aria-hidden="true" />
+              <input id="gene-search" type="search" autoComplete="off" spellCheck={false} value={search} onChange={(event) => setSearch(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-3" placeholder="Search genes" />
+            </div>
+            <div className="-mx-1 grid max-h-[9.5rem] grid-cols-3 gap-px overflow-y-auto px-1 sm:grid-cols-4 xl:max-h-[11rem] xl:grid-cols-2">
+              {visibleGenes.map((gene) => (
+                <button key={gene.gene} aria-pressed={selectedGene === gene.gene} onClick={() => { setSelectedGene(gene.gene); setDisplayMode('gene'); }}
+                  className={`gene h-7 truncate rounded-md px-2 text-left text-[13px] transition-colors ${selectedGene !== gene.gene ? 'text-ink hover:bg-ground' : displayMode === 'gene' ? 'bg-plum font-medium text-white' : 'bg-plum-soft font-medium text-plum'}`}>
+                  {gene.gene}
+                </button>
+              ))}
+              {search && !visibleGenes.length && <p className="col-span-full py-1.5 text-xs text-ink-2">No gene matches “{search}”.</p>}
+            </div>
+            {geneError && <div role="alert" className="text-xs text-plum">Expression unavailable. <button className="underline underline-offset-2" onClick={() => setGeneRetry((value) => value + 1)}>Retry</button></div>}
+            {matchingGenes.length > visibleGenes.length && <p className="text-[11px] text-ink-3">{search ? `Showing ${visibleGenes.length} of ${formatNumber(matchingGenes.length)} matches.` : 'Type to search all genes.'}</p>}
+          </div>
+
+          {displayMode === 'gene' && <div className="space-y-3 px-4 py-3.5">
+            <fieldset className="m-0 min-w-0 border-0 p-0">
+              <legend className="control-label float-left mb-1.5 w-full">Color scale</legend>
+              <div className="clear-left grid gap-1 sm:grid-cols-3 xl:grid-cols-1">
                 {gradientOptions.map((gradient) => (
-                  <Button key={gradient.id} variant="outline" size="sm" className={`h-9 justify-start gap-2.5 bg-white ${gradientId === gradient.id ? 'border-[#9f3d6c] ring-1 ring-[#9f3d6c]/30' : ''}`} onClick={() => setGradientId(gradient.id)} aria-pressed={gradientId === gradient.id}>
-                    <span className="h-2.5 w-12 shrink-0 rounded-full" style={{ background: `linear-gradient(90deg, ${gradient.stops.join(', ')})` }} />
-                    <span className="truncate text-[11px]">{gradient.label}</span>
-                  </Button>
+                  <button key={gradient.id} onClick={() => setGradientId(gradient.id)} aria-pressed={gradientId === gradient.id}
+                    className={`flex h-7 items-center gap-2.5 rounded-md border px-2 text-left text-xs transition-colors ${gradientId === gradient.id ? 'border-plum bg-white text-ink ring-1 ring-plum' : 'border-transparent text-ink-2 hover:bg-ground hover:text-ink'}`}>
+                    <span className="h-2 w-14 shrink-0 rounded-[2px]" style={{ background: `linear-gradient(90deg, ${gradient.stops.join(', ')})` }} />
+                    {gradient.label}
+                  </button>
                 ))}
               </div>
-            </section>
-          )}
-
-          {displayMode === 'gene' && <section className="mt-3.5 space-y-1.5">
-            <label className="control-label" htmlFor="expression-max">Expression maximum</label>
-            <input id="expression-max" type="number" min="0.000001" step="any" placeholder="Automatic (detected-cell P95)" value={manualMax} onChange={(event) => setManualMax(event.target.value)} className="w-full rounded-md border border-[#d7d0c5] bg-white px-2 py-1.5 text-xs" />
-            <p className="text-[10px] text-[#91877d]">Leave blank for automatic scaling. Enter the same maximum to compare samples. Values are {data.dataset.expression.assay}/{data.dataset.expression.layer}.</p>
-            {manualMax && !hasManualMax && <p className="text-xs text-red-700">Enter a positive maximum. Automatic scaling is active.</p>}
-          </section>}
-
-          {isHd && <section className="mt-3.5 space-y-1.5">
-            <label className="flex items-center justify-between text-xs" htmlFor="hd-dot-size"><span className="control-label">Cell dot size</span><span>{hdDotSize}%</span></label>
-            <input id="hd-dot-size" className="atlas-range w-full" type="range" min="25" max="100" step="5" value={hdDotSize} onChange={(event) => setHdDotSize(Number(event.target.value))} />
-          </section>}
-
-          <section className="mt-3.5 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <p className="control-label">Gene</p>
-              <span className="text-[10px] text-[#91877d]">{formatNumber(data.genes.length)} {data.dataset.expression.assay} genes</span>
+            </fieldset>
+            <div className="space-y-1.5">
+              <label className="control-label" htmlFor="expression-max">Expression maximum</label>
+              <input id="expression-max" type="number" min="0.000001" step="any" inputMode="decimal" placeholder={`Automatic (${automaticCeiling ? automaticCeiling.toFixed(2) : 'P95'})`} value={manualMax} onChange={(event) => setManualMax(event.target.value)}
+                className="h-8 w-full rounded-md border border-rule-strong bg-white px-2.5 text-sm tabular-nums outline-none placeholder:text-ink-3 focus:border-plum focus:ring-2 focus:ring-plum/15" />
+              {manualMax && !hasManualMax
+                ? <p className="text-xs text-plum" role="alert">Enter a positive number. Automatic scaling is on.</p>
+                : <p className="text-[11px] leading-4 text-ink-3">Leave blank for automatic scaling. Enter the same maximum to compare samples. Values are {data.dataset.expression.assay}/{data.dataset.expression.layer}.</p>}
             </div>
-            <label className="flex h-9 items-center gap-2 rounded-lg border border-[#d7d0c5] bg-white px-2.5 focus-within:ring-2 focus-within:ring-[#b7517d]/25">
-              <Search className="size-3.5 text-[#8f857c]" />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#aaa097]" placeholder="Search genes" />
-            </label>
-            <div className="grid max-h-32 grid-cols-3 gap-1 overflow-auto pr-1 xl:grid-cols-2">
-              {visibleGenes.map((gene) => (
-                <Button key={gene.gene} variant={selectedGene === gene.gene ? 'default' : 'outline'} size="sm" className={selectedGene === gene.gene ? 'justify-start bg-[#9f3d6c] hover:bg-[#9f3d6c]/90' : 'justify-start bg-white'} onClick={() => { setSelectedGene(gene.gene); setDisplayMode('gene'); }}>
-                  {gene.gene}
-                </Button>
-              ))}
-            </div>
-            {geneError && <div role="alert" className="text-xs text-[#96345f]">Expression unavailable. <button className="underline" onClick={() => setGeneRetry((value) => value + 1)}>Retry</button></div>}
-            {matchingGenes.length > visibleGenes.length && <p className="text-[10px] text-[#91877d]">Type to search {formatNumber(matchingGenes.length)} available genes.</p>}
-          </section>
+          </div>}
 
-        </aside>
+          {isHd && <div className="space-y-2 px-4 py-3.5">
+            <label className="flex items-center justify-between" htmlFor="hd-dot-size"><span className="control-label">Cell dot size</span><span className="text-xs tabular-nums text-ink-2">{hdDotSize}%</span></label>
+            <input id="hd-dot-size" className="atlas-range" type="range" min="25" max="100" step="5" value={hdDotSize} onChange={(event) => setHdDotSize(Number(event.target.value))} />
+          </div>}
+        </section>
 
-        <section className="flex min-h-[560px] flex-col p-3 xl:min-h-0">
-          <div className="mb-2 grid items-center gap-2 lg:grid-cols-[1fr_auto_1fr]">
-            <div>
-              <p className="text-sm font-semibold">Spatial view</p>
-              <p className="text-xs text-[#766e67]">H&amp;E with {isHd ? 'segmented-cell centers' : 'capture spots'} · click a {observationSingular} to inspect</p>
+        <section aria-label="Spatial view" className="flex min-h-[min(72svh,118vw)] flex-col p-2 [grid-area:view] sm:p-3 xl:min-h-0">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 pb-2">
+            <p className="mr-auto text-xs text-ink-2">H&amp;E with {isHd ? 'segmented-cell centers' : 'capture spots'}. Click a {observationSingular} to inspect it.</p>
+            <div className="flex items-center gap-4">
+              <OpacitySlider label="H&E" value={imageOpacity} onChange={setImageOpacity} />
+              <OpacitySlider label={observationSingular === 'cell' ? 'Cells' : 'Spots'} value={spotOpacity} onChange={setSpotOpacity} />
             </div>
-            <div className="flex items-center gap-3 rounded-lg border border-[#d7d0c5] bg-[#fbfaf7] px-3 py-1.5 shadow-sm">
-              <label className="grid grid-cols-[auto_82px_28px] items-center gap-2 text-[10px] font-medium text-[#6e665f]">
-                <span>H&amp;E</span>
-                <input className="atlas-range" type="range" min="10" max="100" value={imageOpacity} onChange={(event) => setImageOpacity(Number(event.target.value))} />
-                <span className="text-right tabular-nums">{imageOpacity}%</span>
-              </label>
-              <span className="h-5 w-px bg-[#d7d0c5]" />
-              <label className="grid grid-cols-[auto_82px_28px] items-center gap-2 text-[10px] font-medium text-[#6e665f]">
-                <span>{observationSingular === 'cell' ? 'Cells' : 'Spots'}</span>
-                <input className="atlas-range" type="range" min="10" max="100" value={spotOpacity} onChange={(event) => setSpotOpacity(Number(event.target.value))} />
-                <span className="text-right tabular-nums">{spotOpacity}%</span>
-              </label>
-            </div>
-            <div className="flex items-center justify-self-start rounded-lg border border-[#d7d0c5] bg-[#fbfaf7] p-1 shadow-sm lg:justify-self-end">
+            <div className="flex items-center rounded-md border border-rule-strong bg-panel">
               <Button variant="ghost" size="icon-sm" aria-label="Zoom out" onClick={() => zoomAtCenter(isHd ? camera.scale / 1.25 : camera.scale - 0.2)}><Minus /></Button>
-              <span className="w-12 text-center text-[11px] font-medium text-[#6d655e]">{Math.round(camera.scale * 100)}%</span>
+              <span className="w-11 text-center text-[11px] font-medium tabular-nums text-ink-2" aria-live="polite">{Math.round(camera.scale * 100)}%</span>
               <Button variant="ghost" size="icon-sm" aria-label="Zoom in" onClick={() => zoomAtCenter(isHd ? camera.scale * 1.25 : camera.scale + 0.2)}><Plus /></Button>
+              <span className="h-4 w-px bg-rule" aria-hidden="true" />
               <Button variant="ghost" size="icon-sm" aria-label="Reset view" onClick={() => setCamera({ x: 0, y: 0, scale: 1 })}><RotateCcw /></Button>
             </div>
           </div>
 
           <div
-            className={`relative flex min-h-0 flex-1 touch-pan-y select-none items-center justify-center overflow-hidden rounded-2xl border border-[#cbc3b8] bg-[#ded9d1] p-2 shadow-[0_12px_35px_rgba(63,49,39,0.08)] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            className={`relative flex min-h-0 flex-1 touch-pan-y select-none items-center justify-center overflow-hidden rounded-lg border border-rule-strong bg-[#e5e1da] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
             ref={spatialPanelRef}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
           >
-            {imageStatus !== 'loaded' && <output className="absolute left-4 top-4 z-10 rounded-lg bg-white/95 p-2 text-xs">
-              {imageStatus === 'error' ? <><span>Histology unavailable or image dimensions do not match.</span> <button className="underline" onClick={() => setImageRetry((value) => value + 1)}>Retry image</button></> : 'Loading full-resolution histology…'}
+            {imageStatus !== 'loaded' && <output className="absolute left-3 top-3 z-10 rounded-md border border-rule bg-panel px-2.5 py-1.5 text-xs text-ink-2">
+              {imageStatus === 'error' ? <><span>Histology unavailable or image dimensions do not match.</span> <button className="underline underline-offset-2" onClick={() => setImageRetry((value) => value + 1)}>Retry image</button></> : 'Loading full-resolution histology…'}
             </output>}
             <div ref={spatialViewport} className="absolute inset-2">
               {useCanvas ? <AtlasPointCanvas key={imageKey} points={filteredSpots} colors={spotColors} viewBox={spatialViewBox}
@@ -805,72 +797,139 @@ export default function Home() {
               </svg>}
             </div>
 
-            <div className="absolute bottom-4 left-4 rounded-xl border border-black/10 bg-[#fffefa]/95 p-3 shadow-md backdrop-blur">
+            <figure className="absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-md border border-rule bg-panel/95 px-3 py-2.5 shadow-[0_2px_8px_rgba(29,26,24,0.08)]">
               {displayMode === 'gene' ? (
-                <><div className="mb-2 flex items-center justify-between gap-6 text-[12px] font-medium"><span>{selectedGene}</span><span className="text-[#7d746c]">{geneError ? 'Unavailable' : geneLoading || (isHd && !geneValues) ? 'Loading…' : `0 – ${colorCeiling.toFixed(2)}`}</span></div><div className="h-3 w-48 rounded-full" style={{ background: gradientCss }} /><p className="mt-1 max-w-48 text-[10px] text-[#7d746c]">{hasManualMax ? 'Manual maximum' : '95th percentile of detected cells'} · Values above the maximum use the top color.</p></>
+                <>
+                  <figcaption className="flex items-baseline justify-between gap-6 text-[13px]">
+                    <span className="gene font-medium">{selectedGene}</span>
+                    <span className="text-[11px] text-ink-3">{geneError ? 'Unavailable' : geneLoading || (isHd && !geneValues) ? 'Loading…' : `${data.dataset.expression.assay}/${data.dataset.expression.layer}`}</span>
+                  </figcaption>
+                  <div className="mt-2 h-2 w-52 max-w-full rounded-[2px]" style={{ background: gradientCss }} />
+                  <div className="mt-1 flex justify-between font-mono text-[11px] tabular-nums text-ink-2"><span>0</span><span>{geneLoading || (isHd && !geneValues) ? '–' : `${colorCeiling.toFixed(2)}${hasManualMax ? '' : ' (P95)'}`}</span></div>
+                  <p className="mt-1.5 max-w-52 text-[11px] leading-4 text-ink-3">{hasManualMax ? 'Manual maximum.' : '95th percentile of expressing cells.'} Higher values use the top color.</p>
+                </>
               ) : (
-                <div className="flex max-w-72 flex-wrap gap-x-4 gap-y-2">
-                  {data.dataset.identities.map((identity) => <span key={identity} title={identityNames[identity]} className="flex items-center gap-2 text-[13px] font-medium"><i className="size-3 rounded-full" style={{ background: getIdentityColor(identity) }} />{identity}</span>)}
-                </div>
+                <ul className="grid gap-1.5" aria-label="Identity legend">
+                  {legendIdentities.map((identity) => (
+                    <li key={identity} className="flex items-center gap-2 text-[13px] leading-4">
+                      <i className="size-2.5 shrink-0 rounded-full" style={{ background: getIdentityColor(identity) }} aria-hidden="true" />
+                      <span className="font-medium">{identity}</span>
+                      {identityNames[identity] && <span className="hidden text-ink-3 sm:inline">{identityNames[identity]}</span>}
+                    </li>
+                  ))}
+                </ul>
               )}
-            </div>
-            <div className="pointer-events-none absolute right-4 top-4 rounded-full border border-black/10 bg-[#fffefa]/90 px-3 py-1.5 text-[11px] font-medium text-[#5f5852] shadow-sm backdrop-blur">Drag to move · scroll to zoom · {formatNumber(filteredSpots.length)} {observationPlural}</div>
+            </figure>
+            <p className="pointer-events-none absolute right-3 top-3 hidden rounded-md bg-panel/90 px-2 py-1 text-[11px] text-ink-2 sm:block">{formatNumber(filteredSpots.length)} {observationPlural} · drag to pan, scroll to zoom</p>
           </div>
         </section>
 
-        <aside className="border-t border-[#d7d0c5] bg-[#fbfaf7] p-3 xl:overflow-y-auto xl:border-l xl:border-t-0">
-          <div className="mb-3 rounded-xl border border-[#d7d0c5] bg-white p-3">
-            <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold">Linked UMAP</p><span className="text-[10px] text-[#8a8179]">{data.dataset.embedding_label}</span></div>
+        <aside className="divide-y divide-rule border-t border-rule bg-panel [grid-area:side] xl:min-h-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">
+          <section className="px-4 py-3.5" aria-labelledby="umap-heading">
+            <div className="mb-2 flex items-baseline justify-between gap-2"><h2 id="umap-heading" className="text-[13px] font-semibold">Linked UMAP</h2><span className="text-[11px] text-ink-3">{data.dataset.embedding_label}</span></div>
             {umapPanel}
-          </div>
+          </section>
 
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Crosshair className="size-4 text-[#8f315d]" />{observationSingular === 'cell' ? 'Cell' : 'Spot'} inspector</div>
-          {selectedSpot ? (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-[#d7d0c5] bg-white p-3.5 shadow-sm">
-                <p className="truncate font-mono text-[11px] text-[#7a7169]">{selectedSpot.barcode}</p>
-                <div className="mt-3 flex items-center justify-between">
-                  <div><p className="text-lg font-semibold">{selectedSpot.identity}</p><p className="text-xs text-[#756d66]">{data.dataset.tissue_type === 'gGBO' ? `Line ${formatGboLine(selectedSpot.line)}` : selectedSpot.line} · Cluster {selectedSpot.cluster}</p></div>
-                  <i className="size-5 rounded-full border-2 border-white shadow" style={{ background: getIdentityColor(selectedSpot.identity) }} />
+          <section className="px-4 py-3.5" aria-labelledby="inspector-heading" aria-live="polite">
+            <h2 id="inspector-heading" className="mb-2 text-[13px] font-semibold">Selected {observationSingular}</h2>
+            {selectedSpot ? (
+              <div className="space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <i className="mt-1 size-3 shrink-0 rounded-full ring-2 ring-white" style={{ background: getIdentityColor(selectedSpot.identity) }} aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="text-base font-semibold leading-5">{selectedSpot.identity}</p>
+                    {identityNames[selectedSpot.identity] && <p className="text-xs text-ink-3">{identityNames[selectedSpot.identity]}</p>}
+                    <p className="mt-1 truncate font-mono text-[11px] text-ink-3" title={selectedSpot.barcode}>{selectedSpot.barcode}</p>
+                  </div>
                 </div>
+                <dl className="grid grid-cols-2 gap-x-4 border-t border-rule text-sm">
+                  <Reading label={data.dataset.tissue_type === 'gGBO' ? 'Line' : 'Sample'} value={data.dataset.tissue_type === 'gGBO' ? formatGboLine(selectedSpot.line) : selectedSpot.line} />
+                  <Reading label="Cluster" value={selectedSpot.cluster} />
+                  <Reading label="UMIs" value={formatNumber(selectedSpot.counts)} />
+                  <Reading label="Genes" value={formatNumber(selectedSpot.features)} />
+                  <Reading label="Mito" value={`${selectedSpot.mito.toFixed(1)}%`} />
+                  <Reading label={<span className="gene">{selectedGene}</span>} value={selectedValue !== null ? selectedValue.toFixed(2) : geneError ? 'Unavailable' : '…'} accent />
+                </dl>
+                {selectedSpot.expression && <div>
+                  <p className="mb-2 text-xs font-medium text-ink-2">Featured genes</p>
+                  <div className="space-y-1">
+                    {data.genes.slice(0, 6).map((gene) => {
+                      const value = selectedSpot.expression?.[gene.gene] ?? 0;
+                      const width = Math.min(100, (value / (gene.q95 || gene.max || 1)) * 100);
+                      return <button key={gene.gene} className="grid w-full grid-cols-[52px_1fr_32px] items-center gap-2 rounded-sm py-0.5 text-left text-xs hover:bg-ground" onClick={() => { setSelectedGene(gene.gene); setDisplayMode('gene'); }}>
+                        <span className="gene font-medium">{gene.gene}</span>
+                        <span className="h-1.5 overflow-hidden rounded-full bg-ground"><i className="block h-full rounded-full bg-plum" style={{ width: `${width}%` }} /></span>
+                        <span className="text-right tabular-nums text-ink-2">{value.toFixed(1)}</span>
+                      </button>;
+                    })}
+                  </div>
+                </div>}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Metric label="UMIs" value={formatNumber(selectedSpot.counts)} />
-                <Metric label="Genes" value={formatNumber(selectedSpot.features)} />
-                <Metric label="Mito" value={`${selectedSpot.mito.toFixed(1)}%`} />
-                <Metric label={selectedGene} value={geneLoading ? '…' : (getSelectedExpression(selectedSpot)?.toFixed(2) ?? (geneError ? 'Unavailable' : '…'))} accent />
-              </div>
-              {selectedSpot.expression && <div className="rounded-xl border border-[#d7d0c5] bg-white p-3.5">
-                <p className="mb-3 text-xs font-semibold">Selected expression</p>
-                <div className="space-y-2.5">
-                  {data.genes.slice(0, 6).map((gene) => {
-                    const value = selectedSpot.expression?.[gene.gene] ?? 0;
-                    const width = Math.min(100, (value / (gene.q95 || gene.max || 1)) * 100);
-                    return <button key={gene.gene} className="grid w-full grid-cols-[42px_1fr_36px] items-center gap-2 text-left text-[11px]" onClick={() => { setSelectedGene(gene.gene); setDisplayMode('gene'); }}><span className="font-medium">{gene.gene}</span><span className="h-1.5 overflow-hidden rounded-full bg-[#eee8e1]"><i className="block h-full rounded-full bg-[#a43f6f]" style={{ width: `${width}%` }} /></span><span className="text-right tabular-nums text-[#7b726a]">{value.toFixed(1)}</span></button>;
-                  })}
-                </div>
-              </div>}
-            </div>
-          ) : (
-            <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-[#cfc6bb] bg-[#f5f2ed] p-6 text-center">
-              <div><div className="mx-auto mb-3 grid size-10 place-items-center rounded-full bg-white text-[#9c3f68] shadow-sm"><CircleDot className="size-5" /></div><p className="text-sm font-medium">Select a spatial {observationSingular}</p><p className="mt-1 text-xs leading-5 text-[#7d746c]">Inspect its identity, QC metrics, expression and position in the linked UMAP.</p></div>
-            </div>
-          )}
-          <div className="mt-4 rounded-xl border border-[#d7d0c5] bg-[#f1ece5] p-3 text-[11px] leading-4 text-[#6e665f]">
-            <div className="mb-1 flex items-center gap-1.5 font-semibold text-[#4d4742]"><ImageIcon className="size-3.5" />About this dataset</div>
-            {data.dataset.description}
-          </div>
+            ) : (
+              <p className="text-[13px] leading-5 text-ink-2">Click a {observationSingular} in the tissue or the UMAP to see its identity, cluster, QC values, and <span className="gene">{selectedGene}</span> expression.</p>
+            )}
+          </section>
+
+          <section className="px-4 py-3.5" aria-labelledby="dataset-heading">
+            <h2 id="dataset-heading" className="mb-1.5 text-[13px] font-semibold">About this dataset</h2>
+            <p className="text-[13px] leading-5 text-ink-2">{data.dataset.description}</p>
+            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px] leading-4">
+              <dt className="text-ink-3">Cohort</dt><dd className="text-ink-2">{data.dataset.cohort}</dd>
+              <dt className="text-ink-3">{isHd ? 'Cells' : 'Spots'}</dt><dd className="tabular-nums text-ink-2">{formatNumber(data.dataset.spot_count)}</dd>
+              {data.dataset.source_object && <><dt className="text-ink-3">Source</dt><dd className="break-all font-mono text-ink-2">{data.dataset.source_object}</dd></>}
+            </dl>
+          </section>
         </aside>
       </div>
     </main>
   );
 }
 
-function Metric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+const zoneOrder = ['OPZ', 'IQZ', 'HCZ'];
+function zoneRank(identity: string) {
+  const index = zoneOrder.indexOf(identity);
+  return index < 0 ? zoneOrder.length : index;
+}
+
+function toggleClass(active: boolean) {
+  return `h-7 rounded-md border px-2.5 text-xs font-medium tabular-nums transition-colors ${active ? 'border-plum bg-plum text-white' : 'border-rule-strong bg-white text-ink-2 hover:border-ink-3 hover:text-ink'}`;
+}
+
+// The gGBO zones from rim to core: OPZ, IQZ, HCZ.
+function ZoneMark({ className = '' }: { className?: string }) {
   return (
-    <div className={`rounded-xl border p-3 ${accent ? 'border-[#d8a8bb] bg-[#fff3f7]' : 'border-[#d7d0c5] bg-white'}`}>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#837a72]">{label}</p>
-      <p className={`mt-1 text-base font-semibold tabular-nums ${accent ? 'text-[#96345f]' : ''}`}>{value}</p>
+    <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
+      <circle cx="16" cy="16" r="15" fill={identityColors.OPZ} />
+      <circle cx="16" cy="16" r="10.25" fill={identityColors.IQZ} stroke="var(--atlas-panel)" strokeWidth="1.5" />
+      <circle cx="16" cy="16" r="5.5" fill={identityColors.HCZ} stroke="var(--atlas-panel)" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="control-label block" htmlFor={htmlFor}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function OpacitySlider({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+  return (
+    <label className="grid grid-cols-[auto_72px_30px] items-center gap-2 text-[11px] font-medium text-ink-2">
+      <span>{label}</span>
+      <input className="atlas-range" type="range" min="10" max="100" value={value} aria-label={`${label} opacity`} onChange={(event) => onChange(Number(event.target.value))} />
+      <span className="text-right tabular-nums">{value}%</span>
+    </label>
+  );
+}
+
+function Reading({ label, value, accent = false }: { label: React.ReactNode; value: string; accent?: boolean }) {
+  return (
+    <div className="border-b border-rule py-1.5">
+      <dt className="text-[11px] text-ink-3">{label}</dt>
+      <dd className={`font-medium tabular-nums ${accent ? 'text-plum' : ''}`}>{value}</dd>
     </div>
   );
 }
