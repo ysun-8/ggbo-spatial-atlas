@@ -195,7 +195,7 @@ export default function Home() {
     setUrlReady(true);
   }, []);
   const [displayMode, setDisplayMode] = useState<'gene' | 'identity'>('identity');
-  const [gradientId, setGradientId] = useState<GradientId>('seurat');
+  const [gradientId, setGradientId] = useState<GradientId>('viridis');
   const [geneResult, setGeneResult] = useState<{ data: VisiumData; gene: string; values: Float32Array } | null>(null);
   const geneValues = geneResult?.data === data && geneResult.gene === selectedGene ? geneResult.values : null;
   const [datasetError, setDatasetError] = useState(false);
@@ -204,6 +204,12 @@ export default function Home() {
   const [geneRetry, setGeneRetry] = useState(0);
 
   const [geneLoading, setGeneLoading] = useState(false);
+  const [geneNotice, setGeneNotice] = useState('');
+  // The gene, mode, and maximum carry over when switching datasets so readers can compare samples.
+  const currentView = useRef<{ gene: string; mode: 'gene' | 'identity'; max: string } | null>(null);
+  useEffect(() => {
+    if (urlReady) currentView.current = { gene: selectedGene, mode: displayMode, max: manualMax };
+  }, [urlReady, selectedGene, displayMode, manualMax]);
   const [lineFilter, setLineFilter] = useState('all');
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const needsExpression = displayMode === 'gene' || selectedSpot !== null;
@@ -275,16 +281,20 @@ export default function Home() {
         setData(merged);
         const view = requestedView.current?.dataset === datasetId ? requestedView.current : null;
         requestedView.current = null;
+        const carried = view ?? currentView.current;
         const capture = merged.dataset.captures.find((item) => item.id === view?.capture) ?? merged.dataset.captures[0];
         setSelectedCaptureId(capture.id);
         geneChunkCache.current.clear();
         if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
         cameraFrame.current = null;
         pendingCamera.current = null;
-        const gene = view?.gene ?? 'CA9';
-        setSelectedGene(payload.genes.some((item) => item.gene === gene) ? gene : payload.genes[0]?.gene ?? '');
-        setDisplayMode(view?.mode === 'gene' ? 'gene' : 'identity');
-        setManualMax(view?.max ?? '');
+        const gene = carried?.gene ?? 'CA9';
+        const fallbackGene = payload.genes.some((item) => item.gene === 'CA9') ? 'CA9' : payload.genes[0]?.gene ?? '';
+        const geneFound = payload.genes.some((item) => item.gene === gene);
+        setSelectedGene(geneFound ? gene : fallbackGene);
+        setGeneNotice(geneFound ? '' : `${gene} isn’t in this dataset. Showing ${fallbackGene}.`);
+        setDisplayMode(carried?.mode === 'gene' ? 'gene' : 'identity');
+        setManualMax(carried?.max ?? '');
         setGeneResult(null);
         setGeneError(false);
         // No expression request is needed in this state.
@@ -359,6 +369,19 @@ export default function Home() {
     if (!data) return [];
     return filterCaptureSpots(data.spots, activeCapture, 'all', lineFilter) as Spot[];
   }, [data, activeCapture, lineFilter]);
+
+  // Offer only the lines that have spots on the active capture area.
+  const captureLines = useMemo(() => {
+    if (!data) return [];
+    const present = new Set((filterCaptureSpots(data.spots, activeCapture) as Spot[]).map((spot) => spot.line));
+    return data.dataset.lines.filter((line) => present.has(line));
+  }, [data, activeCapture]);
+
+  const pickGene = (gene: string) => {
+    setSelectedGene(gene);
+    setDisplayMode('gene');
+    setGeneNotice('');
+  };
 
   const automaticCeiling = useMemo(() => {
     if (geneValues) return detectedCeiling(geneValues);
@@ -686,8 +709,8 @@ export default function Home() {
           {!isHd && <fieldset className="m-0 min-w-0 space-y-1.5 border-0 p-0 sm:col-span-2 xl:col-span-1">
             <legend className="control-label mb-1.5">{lineLabel}</legend>
             <div className="flex flex-wrap gap-1.5">
-              {(data.dataset.lines.length === 1 ? data.dataset.lines : ['all', ...data.dataset.lines]).map((line) => (
-                <button key={line} className={toggleClass(lineFilter === line)} aria-pressed={lineFilter === line} onClick={() => { setLineFilter(line); setSelectedSpot(null); }}>
+              {(captureLines.length <= 1 ? captureLines : ['all', ...captureLines]).map((line) => (
+                <button key={line} className={toggleClass(lineFilter === line || captureLines.length === 1)} aria-pressed={lineFilter === line || captureLines.length === 1} onClick={() => { setLineFilter(line); setSelectedSpot(null); }}>
                   {line === 'all' ? 'All' : data.dataset.tissue_type === 'gGBO' ? formatGboLine(line) : line}
                 </button>
               ))}
@@ -720,13 +743,14 @@ export default function Home() {
             </div>
             <div className="-mx-1 grid max-h-[9.5rem] grid-cols-3 gap-px overflow-y-auto px-1 sm:grid-cols-4 xl:max-h-[11rem] xl:grid-cols-2">
               {visibleGenes.map((gene) => (
-                <button key={gene.gene} aria-pressed={selectedGene === gene.gene} onClick={() => { setSelectedGene(gene.gene); setDisplayMode('gene'); }}
+                <button key={gene.gene} aria-pressed={selectedGene === gene.gene} onClick={() => pickGene(gene.gene)}
                   className={`gene h-7 truncate rounded-md px-2 text-left text-[13px] transition-colors ${selectedGene !== gene.gene ? 'text-ink hover:bg-ground' : displayMode === 'gene' ? 'bg-plum font-medium text-white' : 'bg-plum-soft font-medium text-plum'}`}>
                   {gene.gene}
                 </button>
               ))}
               {search && !visibleGenes.length && <p className="col-span-full py-1.5 text-xs text-ink-2">No gene matches “{search}”.</p>}
             </div>
+            {geneNotice && <output className="block text-xs text-plum">{geneNotice}</output>}
             {geneError && <div role="alert" className="text-xs text-plum">Expression unavailable. <button className="underline underline-offset-2" onClick={() => setGeneRetry((value) => value + 1)}>Retry</button></div>}
             {matchingGenes.length > visibleGenes.length && <p className="text-[11px] text-ink-3">{search ? `Showing ${visibleGenes.length} of ${formatNumber(matchingGenes.length)} matches.` : 'Type to search all genes.'}</p>}
           </div>
@@ -769,7 +793,7 @@ export default function Home() {
             </div>
             <div className="flex items-center rounded-md border border-rule-strong bg-panel">
               <Button variant="ghost" size="icon-sm" aria-label="Zoom out" onClick={() => zoomAtCenter(isHd ? camera.scale / 1.25 : camera.scale - 0.2)}><Minus /></Button>
-              <span className="w-11 text-center text-[11px] font-medium tabular-nums text-ink-2" aria-live="polite">{Math.round(camera.scale * 100)}%</span>
+              <span className="w-11 text-center text-[11px] font-medium tabular-nums text-ink-2">{Math.round(camera.scale * 100)}%</span>
               <Button variant="ghost" size="icon-sm" aria-label="Zoom in" onClick={() => zoomAtCenter(isHd ? camera.scale * 1.25 : camera.scale + 0.2)}><Plus /></Button>
               <span className="h-4 w-px bg-rule" aria-hidden="true" />
               <Button variant="ghost" size="icon-sm" aria-label="Reset view" onClick={() => setCamera({ x: 0, y: 0, scale: 1 })}><RotateCcw /></Button>
@@ -830,7 +854,7 @@ export default function Home() {
             {umapPanel}
           </section>
 
-          <section className="px-4 py-3.5" aria-labelledby="inspector-heading" aria-live="polite">
+          <section className="px-4 py-3.5" aria-labelledby="inspector-heading">
             <h2 id="inspector-heading" className="mb-2 text-[13px] font-semibold">Selected {observationSingular}</h2>
             {selectedSpot ? (
               <div className="space-y-3">
@@ -856,7 +880,7 @@ export default function Home() {
                     {data.genes.slice(0, 6).map((gene) => {
                       const value = selectedSpot.expression?.[gene.gene] ?? 0;
                       const width = Math.min(100, (value / (gene.q95 || gene.max || 1)) * 100);
-                      return <button key={gene.gene} className="grid w-full grid-cols-[52px_1fr_32px] items-center gap-2 rounded-sm py-0.5 text-left text-xs hover:bg-ground" onClick={() => { setSelectedGene(gene.gene); setDisplayMode('gene'); }}>
+                      return <button key={gene.gene} className="grid w-full grid-cols-[52px_1fr_32px] items-center gap-2 rounded-sm py-0.5 text-left text-xs hover:bg-ground" onClick={() => pickGene(gene.gene)}>
                         <span className="gene font-medium">{gene.gene}</span>
                         <span className="h-1.5 overflow-hidden rounded-full bg-ground"><i className="block h-full rounded-full bg-plum" style={{ width: `${width}%` }} /></span>
                         <span className="text-right tabular-nums text-ink-2">{value.toFixed(1)}</span>
