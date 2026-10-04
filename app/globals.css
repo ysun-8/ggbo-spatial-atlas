@@ -7,9 +7,18 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-public-sans);
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --font-heading: var(--font-sans);
+  --color-ground: var(--atlas-ground);
+  --color-panel: var(--atlas-panel);
+  --color-rule: var(--atlas-rule);
+  --color-rule-strong: var(--atlas-rule-strong);
+  --color-ink: var(--atlas-ink);
+  --color-ink-2: var(--atlas-ink-2);
+  --color-ink-3: var(--atlas-ink-3);
+  --color-plum: var(--atlas-plum);
+  --color-plum-soft: var(--atlas-plum-soft);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,28 +58,37 @@
 }
 
 body {
-  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  font-family: var(--font-public-sans), Arial, Helvetica, sans-serif;
 }
 
 :root {
+  --atlas-ground: #eeebe5;
+  --atlas-panel: #faf9f6;
+  --atlas-rule: #ddd6cc;
+  --atlas-rule-strong: #c8bfb3;
+  --atlas-ink: #1d1a18;
+  --atlas-ink-2: #4f4842;
+  --atlas-ink-3: #6b625a;
+  --atlas-plum: #7c2d55;
+  --atlas-plum-soft: #f3e8ed;
   --background: oklch(0.96 0.012 74);
   --foreground: oklch(0.22 0.012 65);
   --card: oklch(0.99 0.006 78);
   --card-foreground: oklch(0.22 0.012 65);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.31 0.09 318);
+  --primary: #7c2d55;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.93 0.016 70);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.93 0.016 70);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted-foreground: #6b625a;
   --accent: oklch(0.91 0.04 350);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.84 0.018 70);
-  --input: oklch(0.84 0.018 70);
-  --ring: oklch(0.55 0.13 345);
+  --border: #ddd6cc;
+  --input: #c8bfb3;
+  --ring: #7c2d55;
   --chart-1: oklch(0.5 0.15 344);
   --chart-2: oklch(0.63 0.12 194);
   --chart-3: oklch(0.74 0.15 69);
@@ -88,29 +106,63 @@ body {
 }
 
 .control-label {
-  color: #766d65;
+  color: var(--atlas-ink-3);
   font-size: 0.75rem;
-  font-weight: 650;
+  font-weight: 500;
   line-height: 1rem;
+}
+
+/* Gene symbols are italic, following HGNC convention. */
+.gene {
+  font-style: italic;
 }
 
 .atlas-range {
   width: 100%;
-  height: 4px;
+  height: 3px;
   appearance: none;
   border-radius: 999px;
-  background: #ded7cf;
+  background: var(--atlas-rule-strong);
   cursor: pointer;
 }
 
 .atlas-range::-webkit-slider-thumb {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   appearance: none;
   border: 2px solid white;
   border-radius: 999px;
-  background: #91355f;
-  box-shadow: 0 1px 4px rgb(52 29 50 / 24%);
+  background: var(--atlas-plum);
+  box-shadow: 0 1px 3px rgb(29 26 24 / 30%);
+}
+
+.atlas-range::-moz-range-thumb {
+  width: 9px;
+  height: 9px;
+  border: 2px solid white;
+  border-radius: 999px;
+  background: var(--atlas-plum);
+  box-shadow: 0 1px 3px rgb(29 26 24 / 30%);
+}
+
+.atlas-range:focus-visible {
+  outline: 2px solid var(--atlas-plum);
+  outline-offset: 4px;
+}
+
+::selection {
+  background: var(--atlas-plum-soft);
+  color: var(--atlas-ink);
+}
+
+:root {
+  accent-color: var(--atlas-plum);
+  scrollbar-color: var(--atlas-rule-strong) transparent;
+  scrollbar-width: thin;
+}
+
+:focus-visible {
+  outline-color: var(--atlas-plum);
 }
 
 button,
