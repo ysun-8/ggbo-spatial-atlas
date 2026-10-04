@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link2, Minus, Plus, RotateCcw, Search } from 'lucide-react';
+import { ChevronDown, Link2, Minus, Plus, RotateCcw, Search, X } from 'lucide-react';
 
-import { detectedCeiling, readView, writeView, assetPath, pinchCamera } from '@/lib/atlas-display.mjs';
+import { detectedCeiling, readView, writeView, assetPath, pinchCamera, parseZoom, cameraCenter, cameraForCenter } from '@/lib/atlas-display.mjs';
+import { nearestPoint, nextPointInDirection } from '@/lib/atlas-canvas.mjs';
+import { searchGenes } from '@/lib/atlas-genes.mjs';
 import { AtlasPointCanvas } from '@/components/atlas-point-canvas';
 import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -202,14 +204,24 @@ export default function Home() {
   const [selectedGene, setSelectedGene] = useState('CA9');
   const [manualMax, setManualMax] = useState('');
   const [urlReady, setUrlReady] = useState(false);
+  const [gradientId, setGradientId] = useState<GradientId>('viridis');
+  const [imageOpacity, setImageOpacity] = useState(50);
+  const [spotOpacity, setSpotOpacity] = useState(80);
+  const [hdDotSize, setHdDotSize] = useState(40);
   const requestedView = useRef<ReturnType<typeof readView> | null>(null);
   useEffect(() => {
-    requestedView.current = readView(window.location.search, datasetOptions, catalog.default_dataset);
-    setDatasetId(requestedView.current.dataset);
+    // The URL is only readable after hydration, so the view is restored here once.
+    const view = readView(window.location.search, datasetOptions, catalog.default_dataset);
+    requestedView.current = view;
+    // oxlint-disable-next-line react/react-compiler
+    setDatasetId(view.dataset);
+    if (gradientOptions.some((option) => option.id === view.cmap)) setGradientId(view.cmap as GradientId);
+    if (view.he) setImageOpacity(Number(view.he));
+    if (view.dots) setSpotOpacity(Number(view.dots));
+    if (view.dot) setHdDotSize(Number(view.dot));
     setUrlReady(true);
   }, []);
   const [displayMode, setDisplayMode] = useState<'gene' | 'identity'>('identity');
-  const [gradientId, setGradientId] = useState<GradientId>('viridis');
   const [geneResult, setGeneResult] = useState<{ data: VisiumData; gene: string; values: Float32Array } | null>(null);
   const geneValues = geneResult?.data === data && geneResult.gene === selectedGene ? geneResult.values : null;
   const [datasetError, setDatasetError] = useState(false);
@@ -227,20 +239,34 @@ export default function Home() {
   const [lineFilter, setLineFilter] = useState('all');
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const needsExpression = displayMode === 'gene' || selectedSpot !== null;
-  const [imageOpacity, setImageOpacity] = useState(50);
-  const [spotOpacity, setSpotOpacity] = useState(80);
-  const [hdDotSize, setHdDotSize] = useState(40);
   const spatialViewport = useRef<HTMLDivElement | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const maxZoom = data?.dataset.kind === 'hd' ? hdMaxZoom : regularMaxZoom;
   const [camera, setCamera] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
   const [search, setSearch] = useState('');
+  const [legendOpen, setLegendOpen] = useState(true);
+  useEffect(() => {
+    // oxlint-disable-next-line react/react-compiler
+    if (window.matchMedia('(max-width: 639px)').matches) setLegendOpen(false);
+  }, []);
   const [shareStatus, setShareStatus] = useState('Copy link');
   const dragStart = useRef<{ pointerId: number; pointerX: number; pointerY: number; cameraX: number; cameraY: number; spotId: string | null } | null>(null);
   const didDrag = useRef(false);
   const cameraFrame = useRef<number | null>(null);
   const pendingCamera = useRef<typeof camera | null>(null);
+  // A shared link's zoom waits until the panel has a size to frame it in.
+  const pendingZoom = useRef<ReturnType<typeof parseZoom>>(null);
+  const [screen, setScreen] = useState({ wide: true, coarse: false });
+  useEffect(() => {
+    const wide = window.matchMedia('(min-width: 1280px)');
+    const coarse = window.matchMedia('(pointer: coarse)');
+    const update = () => setScreen({ wide: wide.matches, coarse: coarse.matches });
+    update();
+    wide.addEventListener('change', update);
+    coarse.addEventListener('change', update);
+    return () => { wide.removeEventListener('change', update); coarse.removeEventListener('change', update); };
+  }, []);
 
   useEffect(() => () => {
     if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
@@ -295,6 +321,7 @@ export default function Home() {
         setData(merged);
         const view = requestedView.current?.dataset === datasetId ? requestedView.current : null;
         requestedView.current = null;
+        pendingZoom.current = view ? parseZoom(view.zoom) : null;
         const carried = view ?? currentView.current;
         const capture = merged.dataset.captures.find((item) => item.id === view?.capture) ?? merged.dataset.captures[0];
         setSelectedCaptureId(capture.id);
@@ -315,7 +342,7 @@ export default function Home() {
       // oxlint-disable-next-line react/react-compiler
       setGeneLoading(false);
         setLineFilter(view && payload.dataset.lines.includes(view.line) ? view.line : payload.dataset.lines.length === 1 ? payload.dataset.lines[0] : 'all');
-        setSelectedSpot(null);
+        setSelectedSpot(view?.cell ? payload.spots.find((spot) => spot.id === view.cell) ?? null : null);
         setCamera({ x: 0, y: 0, scale: 1 });
         setSearch('');
       })
@@ -405,15 +432,17 @@ export default function Home() {
   const parsedMax = Number(manualMax);
   const hasManualMax = Number.isFinite(parsedMax) && parsedMax > 0;
   const colorCeiling = hasManualMax ? parsedMax : automaticCeiling;
-  useEffect(() => {
-    if (!urlReady || !data || data.dataset.id !== datasetId) return;
-    const query = writeView({ dataset: datasetId, capture: selectedCaptureId, line: lineFilter, gene: selectedGene, mode: displayMode, max: hasManualMax ? String(parsedMax) : '' });
-    window.history.replaceState(null, '', window.location.pathname + query + window.location.hash);
-  }, [urlReady, data, datasetId, selectedCaptureId, lineFilter, selectedGene, displayMode, hasManualMax, parsedMax]);
-  const matchingGenes = useMemo(() => {
-    const query = search.toLowerCase();
-    return data?.genes.filter((gene) => gene.gene.toLowerCase().includes(query)) ?? [];
-  }, [data, search]);
+  type GeneSearch = { matches: GeneStat[]; exact: boolean; alias: { term: string; gene: string; present: boolean } | null };
+  const geneSearch = useMemo(() => searchGenes(data?.genes ?? [], search) as GeneSearch, [data, search]);
+  const matchingGenes = geneSearch.matches;
+  const [searchMiss, setSearchMiss] = useState('');
+  const submitSearch = () => {
+    const term = search.trim();
+    if (!term) return;
+    const top = geneSearch.exact || matchingGenes.length === 1 ? matchingGenes[0] : undefined;
+    if (top) { pickGene(top.gene); setSearchMiss(''); }
+    else setSearchMiss(term);
+  };
   const visibleGenes = matchingGenes.slice(0, search ? 60 : 12);
 
   const getIdentityColor = useCallback((identity: string) => {
@@ -462,6 +491,7 @@ export default function Home() {
     const element = spatialPanelRef.current;
     if (!element) return;
     const handleWheel = (event: WheelEvent) => {
+      if (!window.matchMedia('(min-width: 1280px)').matches && !event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
       if (dragStart.current) return;
       const bounds = element.getBoundingClientRect();
@@ -602,7 +632,61 @@ export default function Home() {
   const imageUnitsPerPixel = Math.max(imageWidth / panelWidth, imageHeight / panelHeight) / camera.scale;
   const viewWidth = panelWidth * imageUnitsPerPixel;
   const viewHeight = panelHeight * imageUnitsPerPixel;
-  const spatialViewBox = `${(imageWidth - viewWidth) / 2 - camera.x * imageUnitsPerPixel} ${(imageHeight - viewHeight) / 2 - camera.y * imageUnitsPerPixel} ${viewWidth} ${viewHeight}`;
+  const viewX = (imageWidth - viewWidth) / 2 - camera.x * imageUnitsPerPixel;
+  const viewY = (imageHeight - viewHeight) / 2 - camera.y * imageUnitsPerPixel;
+  const spatialViewBox = `${viewX} ${viewY} ${viewWidth} ${viewHeight}`;
+  const imageSize = { width: imageWidth, height: imageHeight };
+
+  useEffect(() => {
+    const zoom = pendingZoom.current;
+    const element = spatialViewport.current;
+    // Measure directly: resize callbacks don't arrive while the page is in a background tab.
+    const panel = viewportSize.width ? viewportSize : element ? { width: element.clientWidth, height: element.clientHeight } : null;
+    if (!zoom || !panel?.width || !activeCapture) return;
+    pendingZoom.current = null;
+    // oxlint-disable-next-line react/react-compiler
+    setCamera(cameraForCenter(zoom, Math.min(maxZoom, Math.max(minZoom, zoom.scale)), { width: activeCapture.width, height: activeCapture.height }, panel));
+  }, [viewportSize, activeCapture, maxZoom]);
+
+  // Everything needed to reopen this exact view; defaults are left out to keep links short.
+  const isDefaultCamera = camera.scale === 1 && camera.x === 0 && camera.y === 0;
+  const panelSize = { width: panelWidth, height: panelHeight };
+  const center = cameraCenter(camera, imageSize, panelSize);
+  const viewQuery = writeView({ dataset: datasetId, capture: selectedCaptureId, line: lineFilter, gene: selectedGene, mode: displayMode,
+    max: hasManualMax ? String(parsedMax) : '', cmap: gradientId === 'viridis' ? '' : gradientId,
+    he: imageOpacity === 50 ? '' : String(imageOpacity), dots: spotOpacity === 80 ? '' : String(spotOpacity),
+    dot: data?.dataset.kind === 'hd' && hdDotSize !== 40 ? String(hdDotSize) : '',
+    zoom: isDefaultCamera ? '' : `${camera.scale.toFixed(2)},${Math.round(center.cx)},${Math.round(center.cy)}`,
+    cell: selectedSpot?.id ?? '' });
+  useEffect(() => {
+    if (!urlReady || !data || data.dataset.id !== datasetId) return;
+    // Debounced so panning doesn't flood the browser's history API.
+    const timer = window.setTimeout(() => window.history.replaceState(null, '', window.location.pathname + viewQuery + window.location.hash), 250);
+    return () => window.clearTimeout(timer);
+  }, [urlReady, data, datasetId, viewQuery]);
+
+  const zoomIn = () => zoomAtCenter(isHd ? camera.scale * 1.25 : camera.scale + 0.2);
+  const zoomOut = () => zoomAtCenter(isHd ? camera.scale / 1.25 : camera.scale - 0.2);
+  const resetView = () => setCamera({ x: 0, y: 0, scale: 1 });
+
+  // Arrow keys step to the nearest cell in that direction and keep it on screen.
+  const handlePlateKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === 'Escape') { setSelectedSpot(null); return; }
+    if (event.key === '+' || event.key === '=') { event.preventDefault(); zoomIn(); return; }
+    if (event.key === '-' || event.key === '_') { event.preventDefault(); zoomOut(); return; }
+    if (event.key === '0') { event.preventDefault(); resetView(); return; }
+    if (!event.key.startsWith('Arrow') || !filteredSpots.length) return;
+    event.preventDefault();
+    const current = selectedSpot ? filteredSpots.find((spot) => spot.id === selectedSpot.id) : undefined;
+    const next = current
+      ? nextPointInDirection(filteredSpots, current, event.key)
+      : nearestPoint(filteredSpots, viewX + viewWidth / 2, viewY + viewHeight / 2);
+    if (!next) return;
+    setSelectedSpot(next);
+    const onScreen = next.x >= viewX && next.x <= viewX + viewWidth && next.y >= viewY && next.y <= viewY + viewHeight;
+    if (!onScreen) setCamera(cameraForCenter({ cx: next.x, cy: next.y }, camera.scale, imageSize, panelSize));
+  };
   const activeGradient = gradientOptions.find((option) => option.id === gradientId) ?? gradientOptions[0];
   const gradientCss = `linear-gradient(90deg, ${activeGradient.stops.join(', ')})`;
 
@@ -634,11 +718,11 @@ export default function Home() {
   }, [useCanvas, imageWidth, imageHeight, tissueImage, previewImage, imageOpacity, drawnSpots, selectedSpot, selectedPointRadius, pointRadius, spotColors, spotOpacity, isHd]);
 
   const umapPanel = useMemo(() => useCanvas ? (
-    <AtlasPointCanvas points={umapPoints} colors={spotColors} viewBox="0 0 240 180" radius={1} opacity={0.76}
-      selectedId={selectedSpot?.id} label={`UMAP of visible Visium ${observationPlural}`} className="w-full aspect-[4/3] rounded-md bg-ground"
+    <AtlasPointCanvas points={umapPoints} colors={spotColors} viewBox="0 0 240 180" radius={1} opacity={0.76} interactive={false}
+      selectedId={selectedSpot?.id} label={`UMAP of ${observationPlural}`} className="w-full aspect-[4/3] rounded-md bg-ground"
       onSelect={(id) => { const spot = filteredSpots.find((point) => point.id === id); if (spot) setSelectedSpot(spot); }} />
   ) : (
-    <svg viewBox="0 0 240 180" className="w-full rounded-md bg-ground" aria-label={`UMAP of visible Visium ${observationPlural}`} shapeRendering="geometricPrecision">
+    <svg viewBox="0 0 240 180" className="w-full rounded-md bg-ground" aria-label={`UMAP of ${observationPlural}`} shapeRendering="geometricPrecision">
       {umapBounds && drawnSpots.map((spot) => {
         const x = 14 + ((spot.umap_x - umapBounds.minX) / (umapBounds.maxX - umapBounds.minX || 1)) * 212;
         const y = 166 - ((spot.umap_y - umapBounds.minY) / (umapBounds.maxY - umapBounds.minY || 1)) * 152;
@@ -674,9 +758,17 @@ export default function Home() {
     .sort((a, b) => zoneRank(a.identity) - zoneRank(b.identity) || a.index - b.index)
     .map(({ identity }) => identity);
   const selectedValue = selectedSpot ? (geneLoading ? null : getSelectedExpression(selectedSpot)) : null;
+  const selectedValueText = selectedValue !== null ? selectedValue.toFixed(2) : geneError ? 'unavailable' : '…';
+  const selectedStats = data.genes.find((gene) => gene.gene === selectedGene);
+  const detectedShare = selectedStats ? selectedStats.detected / Math.max(1, data.spots.length) : 0;
+  const verb = screen.coarse ? 'Tap' : 'Click';
+  const zoomHint = screen.coarse ? ' Pinch to zoom.' : screen.wide ? '' : ' Hold Ctrl or ⌘ and scroll to zoom.';
+  const announcement = selectedSpot ? `Selected ${selectedSpot.identity} ${observationSingular}. ${selectedGene} ${selectedValueText}.` : '';
 
   return (
     <main className="flex min-h-screen flex-col bg-ground text-ink xl:h-screen">
+      <a href="#tissue" className="sr-only rounded-md bg-plum px-3 py-2 text-sm font-medium text-white focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50">Skip to tissue</a>
+      <p className="sr-only" aria-live="polite">{announcement}</p>
       <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-rule bg-panel px-4 py-2.5 lg:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <ZoneMark className="size-8 shrink-0" />
@@ -688,17 +780,17 @@ export default function Home() {
         <div className="ml-auto flex items-center gap-4 text-xs">
           <span className="hidden tabular-nums text-ink-2 md:inline">{formatNumber(data.dataset.spot_count)} {observationPlural}</span>
           <a className="text-ink underline decoration-rule-strong underline-offset-[3px] hover:decoration-plum" href={publicPath('/about.html')} target="_blank" rel="noreferrer">Methods &amp; source</a>
-          <button className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rule-strong bg-white px-2.5 font-medium text-ink transition-colors hover:border-ink-3" onClick={async () => {
-            try { await navigator.clipboard.writeText(window.location.href); setShareStatus('Link copied'); }
+          <button className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rule-strong bg-white px-2.5 font-medium text-ink transition-colors hover:border-ink-3 pointer-coarse:h-10" onClick={async () => {
+            try { await navigator.clipboard.writeText(window.location.origin + window.location.pathname + viewQuery + window.location.hash); setShareStatus('Link copied'); }
             catch { setShareStatus('Copy from address bar'); }
             window.setTimeout(() => setShareStatus('Copy link'), 3000);
           }}><Link2 className="size-3.5 text-ink-3" aria-hidden="true" /><span aria-live="polite">{shareStatus}</span></button>
         </div>
       </header>
 
-      {/* Phones see the tissue right after the dataset choice; wide screens get three columns. */}
-      <div className="grid flex-1 grid-cols-1 [grid-template-areas:'data'_'view'_'color'_'side'] xl:min-h-0 xl:grid-cols-[264px_minmax(520px,1fr)_288px] xl:grid-rows-[auto_minmax(0,1fr)] xl:[grid-template-areas:'data_view_side'_'color_view_side']">
-        <section aria-label="Dataset" className="grid gap-3 border-b border-rule bg-panel px-4 py-3.5 [grid-area:data] sm:grid-cols-2 xl:grid-cols-1 xl:border-r">
+      {/* Phones get the dataset and gene above the tissue; tablets get two columns and wide screens three. */}
+      <div className="grid flex-1 grid-cols-1 [grid-template-areas:'data'_'view'_'color'_'side'] md:grid-cols-[272px_minmax(0,1fr)] md:[grid-template-areas:'data_view'_'color_side'] xl:min-h-0 xl:grid-cols-[264px_minmax(520px,1fr)_288px] xl:grid-rows-[auto_minmax(0,1fr)] xl:[grid-template-areas:'data_view_side'_'color_view_side']">
+        <section aria-label="Dataset and gene" className="grid grid-cols-2 content-start gap-3 border-b border-rule bg-panel px-4 py-3.5 [grid-area:data] md:grid-cols-1 md:border-r">
           <Field label="Dataset" htmlFor="dataset-group">
             <NativeSelect id="dataset-group" className="w-full bg-white" value={selectedEntry.navigation.group} onChange={(event) => selectGroup(event.target.value)}>
               <optgroup label="Visium">
@@ -729,7 +821,7 @@ export default function Home() {
             </Field>
           )}
 
-          {!isHd && <fieldset className="m-0 min-w-0 space-y-1.5 border-0 p-0 sm:col-span-2 xl:col-span-1">
+          {!isHd && <fieldset className="col-span-2 m-0 min-w-0 space-y-1.5 border-0 p-0 md:col-span-1">
             <legend className="control-label mb-1.5">{lineLabel}</legend>
             <div className="flex flex-wrap gap-1.5">
               {(captureLines.length <= 1 ? captureLines : ['all', ...captureLines]).map((line) => (
@@ -739,44 +831,52 @@ export default function Home() {
               ))}
             </div>
           </fieldset>}
-        </section>
 
-        <section aria-label="Display" className="divide-y divide-rule border-b border-rule bg-panel [grid-area:color] xl:min-h-0 xl:overflow-y-auto xl:border-r xl:border-b-0">
-          <fieldset className="m-0 min-w-0 border-0 px-4 py-3.5">
+          <fieldset className="col-span-2 m-0 min-w-0 border-0 p-0 md:col-span-1">
             <legend className="control-label float-left mb-1.5 w-full">Color {observationPlural} by</legend>
             <div className="clear-left grid grid-cols-2 gap-0.5 rounded-lg bg-ground p-0.5">
-              {(['gene', 'identity'] as const).map((mode) => (
+              {(['identity', 'gene'] as const).map((mode) => (
                 <button key={mode} aria-pressed={displayMode === mode} onClick={() => setDisplayMode(mode)}
-                  className={`h-7 rounded-md text-[13px] font-medium transition-colors ${displayMode === mode ? 'bg-white text-plum shadow-[0_1px_2px_rgba(29,26,24,0.12)]' : 'text-ink-2 hover:text-ink'}`}>
+                  className={`h-7 rounded-md text-[13px] font-medium transition-colors pointer-coarse:h-10 ${displayMode === mode ? 'bg-white text-plum shadow-[0_1px_2px_rgba(29,26,24,0.12)]' : 'text-ink-2 hover:text-ink'}`}>
                   {mode === 'gene' ? 'Gene' : 'Identity'}
                 </button>
               ))}
             </div>
           </fieldset>
 
-          <div className="space-y-2 px-4 py-3.5">
+          <div className="col-span-2 min-w-0 space-y-2 md:col-span-1">
             <div className="flex items-baseline justify-between gap-2">
               <label className="control-label" htmlFor="gene-search">Gene</label>
               <span className="text-xs tabular-nums text-ink-3">{formatNumber(data.genes.length)} genes</span>
             </div>
-            <div className="flex h-8 items-center gap-2 rounded-md border border-rule-strong bg-white px-2.5 focus-within:border-plum focus-within:ring-2 focus-within:ring-plum/15">
+            <div className="flex h-8 items-center gap-2 rounded-md border border-rule-strong bg-white px-2.5 focus-within:border-plum focus-within:ring-2 focus-within:ring-plum/30 pointer-coarse:h-10">
               <Search className="size-3.5 shrink-0 text-ink-3" aria-hidden="true" />
-              <input id="gene-search" type="search" autoComplete="off" spellCheck={false} value={search} onChange={(event) => setSearch(event.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-3" placeholder="Search genes" />
+              <input id="gene-search" type="search" autoComplete="off" spellCheck={false} enterKeyHint="search" value={search}
+                onChange={(event) => { setSearch(event.target.value); setSearchMiss(''); }}
+                onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); submitSearch(); } }}
+                aria-describedby="gene-search-help"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-3" placeholder="Gene or protein, e.g. GLUT1" />
             </div>
-            <div className="-mx-1 grid max-h-[9.5rem] grid-cols-3 gap-px overflow-y-auto px-1 sm:grid-cols-4 xl:max-h-[11rem] xl:grid-cols-2">
+            <div id="gene-search-help" className="space-y-1 empty:hidden">
+              {geneSearch.alias && <p className="text-xs text-ink-2">{geneSearch.alias.term} is <span className="gene">{geneSearch.alias.gene}</span>{geneSearch.alias.present ? '.' : ', which isn’t in this dataset.'}</p>}
+              {searchMiss && <p className="text-xs text-plum" role="alert">No gene named “{searchMiss}” in this dataset.{matchingGenes.length ? ' Similar names are listed below.' : ''}</p>}
+              {geneNotice && <output className="block text-xs text-plum">{geneNotice}</output>}
+              {geneError && <div role="alert" className="text-xs text-plum">Expression unavailable. <button className="underline underline-offset-2" onClick={() => setGeneRetry((value) => value + 1)}>Retry</button></div>}
+            </div>
+            <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 sm:grid sm:max-h-[9.5rem] sm:grid-cols-4 sm:gap-px sm:overflow-x-visible sm:overflow-y-auto sm:pb-0 md:grid-cols-2 pointer-coarse:md:max-h-[11rem] xl:max-h-[11rem]">
               {visibleGenes.map((gene) => (
                 <button key={gene.gene} aria-pressed={selectedGene === gene.gene} onClick={() => pickGene(gene.gene)}
-                  className={`gene h-7 truncate rounded-md px-2 text-left text-[13px] transition-colors ${selectedGene !== gene.gene ? 'text-ink hover:bg-ground' : displayMode === 'gene' ? 'bg-plum font-medium text-white' : 'bg-plum-soft font-medium text-plum'}`}>
+                  className={`gene h-7 shrink-0 truncate rounded-md px-2 text-left text-[13px] transition-colors pointer-coarse:h-10 sm:shrink ${selectedGene !== gene.gene ? 'text-ink hover:bg-ground' : displayMode === 'gene' ? 'bg-plum font-medium text-white' : 'bg-plum-soft font-medium text-plum'}`}>
                   {gene.gene}
                 </button>
               ))}
-              {search && !visibleGenes.length && <p className="col-span-full py-1.5 text-xs text-ink-2">No gene matches “{search}”.</p>}
+              {search && !visibleGenes.length && !geneSearch.alias && <p className="col-span-full py-1.5 text-xs text-ink-2">No gene matches “{search}”.</p>}
             </div>
-            {geneNotice && <output className="block text-xs text-plum">{geneNotice}</output>}
-            {geneError && <div role="alert" className="text-xs text-plum">Expression unavailable. <button className="underline underline-offset-2" onClick={() => setGeneRetry((value) => value + 1)}>Retry</button></div>}
-            {matchingGenes.length > visibleGenes.length && <p className="text-xs text-ink-3">{search ? `Showing ${visibleGenes.length} of ${formatNumber(matchingGenes.length)} matches.` : 'Type to search all genes.'}</p>}
+            {matchingGenes.length > visibleGenes.length && <p className="hidden text-xs text-ink-3 sm:block">{search ? `Showing ${visibleGenes.length} of ${formatNumber(matchingGenes.length)} matches.` : 'Type to search all genes. Press Enter to choose the top match.'}</p>}
           </div>
+        </section>
+
+        <section aria-label="Display settings" className="divide-y divide-rule border-b border-rule bg-panel [grid-area:color] empty:hidden md:border-r md:border-b-0 xl:min-h-0 xl:overflow-y-auto">
 
           {displayMode === 'gene' && <div className="space-y-3 px-4 py-3.5">
             <fieldset className="m-0 min-w-0 border-0 p-0">
@@ -784,7 +884,7 @@ export default function Home() {
               <div className="clear-left grid gap-1 sm:grid-cols-3 xl:grid-cols-1">
                 {gradientOptions.map((gradient) => (
                   <button key={gradient.id} onClick={() => setGradientId(gradient.id)} aria-pressed={gradientId === gradient.id}
-                    className={`flex h-7 items-center gap-2.5 rounded-md border px-2 text-left text-xs transition-colors ${gradientId === gradient.id ? 'border-plum bg-white text-ink ring-1 ring-plum' : 'border-transparent text-ink-2 hover:bg-ground hover:text-ink'}`}>
+                    className={`flex h-7 items-center gap-2.5 rounded-md border px-2 text-left text-xs transition-colors pointer-coarse:h-10 ${gradientId === gradient.id ? 'border-plum bg-white text-ink ring-1 ring-plum' : 'border-transparent text-ink-2 hover:bg-ground hover:text-ink'}`}>
                     <span className="h-2 w-14 shrink-0 rounded-[2px]" style={{ background: `linear-gradient(90deg, ${gradient.stops.join(', ')})` }} />
                     {gradient.label}
                   </button>
@@ -794,7 +894,7 @@ export default function Home() {
             <div className="space-y-1.5">
               <label className="control-label" htmlFor="expression-max">Expression maximum</label>
               <input id="expression-max" type="number" min="0.000001" step="any" inputMode="decimal" placeholder={`Automatic (${automaticCeiling ? automaticCeiling.toFixed(2) : 'P95'})`} value={manualMax} onChange={(event) => setManualMax(event.target.value)}
-                className="h-8 w-full rounded-md border border-rule-strong bg-white px-2.5 text-sm tabular-nums outline-none placeholder:text-ink-3 focus:border-plum focus:ring-2 focus:ring-plum/15" />
+                className="h-8 w-full rounded-md border border-rule-strong bg-white px-2.5 text-sm tabular-nums outline-none placeholder:text-ink-3 focus:border-plum focus:ring-2 focus:ring-plum/30" />
               {manualMax && !hasManualMax
                 ? <p className="text-xs text-plum" role="alert">Enter a positive number. Automatic scaling is on.</p>
                 : <p className="text-xs leading-4 text-ink-3">Leave blank for automatic scaling. Enter the same maximum to compare samples. Values are {data.dataset.expression.assay}/{data.dataset.expression.layer}.</p>}
@@ -803,28 +903,34 @@ export default function Home() {
 
           {isHd && <div className="space-y-2 px-4 py-3.5">
             <label className="flex items-center justify-between" htmlFor="hd-dot-size"><span className="control-label">Cell dot size</span><span className="text-xs tabular-nums text-ink-2">{hdDotSize}%</span></label>
-            <input id="hd-dot-size" className="atlas-range" type="range" min="25" max="100" step="5" value={hdDotSize} onChange={(event) => setHdDotSize(Number(event.target.value))} />
+            <input id="hd-dot-size" className="atlas-range" aria-label="Cell dot size" type="range" min="25" max="100" step="5" value={hdDotSize} onChange={(event) => setHdDotSize(Number(event.target.value))} />
           </div>}
         </section>
 
-        <section aria-label="Spatial view" className="flex min-h-[min(72svh,118vw)] flex-col p-2 [grid-area:view] sm:p-3 xl:min-h-0">
+        <section aria-label="Spatial view" className="flex min-h-[min(72svh,118vw)] flex-col p-2 [grid-area:view] sm:p-3 md:min-h-[70svh] xl:min-h-0">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 pb-2">
-            <p className="mr-auto text-xs text-ink-2">H&amp;E with {isHd ? 'segmented-cell centers' : 'capture spots'}. Click a {observationSingular} to inspect it.</p>
+            <p className="mr-auto text-xs text-ink-2">H&amp;E with {isHd ? 'segmented-cell centers' : 'capture spots'}. {verb} a {observationSingular} to inspect it.{zoomHint}</p>
             <div className="flex items-center gap-4">
               <OpacitySlider label="H&E" value={imageOpacity} onChange={setImageOpacity} />
               <OpacitySlider label={observationSingular === 'cell' ? 'Cells' : 'Spots'} value={spotOpacity} onChange={setSpotOpacity} />
             </div>
             <div className="flex items-center rounded-md border border-rule-strong bg-panel">
-              <Button variant="ghost" size="icon-sm" aria-label="Zoom out" onClick={() => zoomAtCenter(isHd ? camera.scale / 1.25 : camera.scale - 0.2)}><Minus /></Button>
+              <Button variant="ghost" size="icon-sm" className="pointer-coarse:size-10" aria-label="Zoom out" onClick={zoomOut}><Minus /></Button>
               <span className="w-11 text-center text-xs font-medium tabular-nums text-ink-2">{Math.round(camera.scale * 100)}%</span>
-              <Button variant="ghost" size="icon-sm" aria-label="Zoom in" onClick={() => zoomAtCenter(isHd ? camera.scale * 1.25 : camera.scale + 0.2)}><Plus /></Button>
+              <Button variant="ghost" size="icon-sm" className="pointer-coarse:size-10" aria-label="Zoom in" onClick={zoomIn}><Plus /></Button>
               <span className="h-4 w-px bg-rule" aria-hidden="true" />
-              <Button variant="ghost" size="icon-sm" aria-label="Reset view" onClick={() => setCamera({ x: 0, y: 0, scale: 1 })}><RotateCcw /></Button>
+              <Button variant="ghost" size="icon-sm" className="pointer-coarse:size-10" aria-label="Reset view" onClick={resetView}><RotateCcw /></Button>
             </div>
           </div>
 
+          {/* The tissue is one keyboard stop: arrows move between cells, +/- zoom, 0 resets, Escape clears. */}
+          {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions */}
           <div
-            className={`relative flex min-h-0 flex-1 touch-pan-y select-none items-center justify-center overflow-hidden rounded-lg border border-rule-strong bg-[#e5e1da] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            id="tissue"
+            {...applicationRole}
+            aria-label={`Tissue view, ${formatNumber(filteredSpots.length)} ${observationPlural}. Arrow keys move between ${observationPlural}, plus and minus zoom, 0 resets, Escape clears the selection.`}
+            onKeyDown={handlePlateKey}
+            className={`relative flex min-h-0 flex-1 touch-pan-y select-none items-center justify-center overflow-hidden rounded-lg border border-rule-strong bg-[#e5e1da] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
             ref={spatialPanelRef}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -832,42 +938,59 @@ export default function Home() {
             onPointerCancel={handlePointerUp}
           >
             {imageStatus !== 'loaded' && <output className="absolute left-3 top-3 z-10 rounded-md border border-rule bg-panel px-2.5 py-1.5 text-xs text-ink-2">
-              {imageStatus === 'error' ? <><span>Histology unavailable or image dimensions do not match.</span> <button className="underline underline-offset-2" onClick={() => setImageRetry((value) => value + 1)}>Retry image</button></> : 'Loading full-resolution histology…'}
+              {imageStatus === 'error' ? <><span>Histology unavailable or image dimensions do not match.</span> <button className="underline underline-offset-2" onPointerDown={(event) => event.stopPropagation()} onClick={() => setImageRetry((value) => value + 1)}>Retry image</button></> : 'Loading full-resolution histology…'}
             </output>}
             <div ref={spatialViewport} className="absolute inset-2">
               {useCanvas ? <AtlasPointCanvas key={imageKey} points={drawnSpots} colors={spotColors} viewBox={spatialViewBox}
-                radius={pointRadius} opacity={spotOpacity / 100} selectedId={selectedSpot?.id}
-                onKeyboardSelect={(id) => { const spot = filteredSpots.find((point) => point.id === id); if (spot) setSelectedSpot(spot); }}
+                radius={pointRadius} opacity={spotOpacity / 100} selectedId={selectedSpot?.id} interactive={false}
                 label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} className="size-full"
-                background={{ url: tissueImage, previewUrl: previewImage, width: imageWidth, height: imageHeight, opacity: imageOpacity / 100 }} /> : <svg className="size-full overflow-visible" viewBox={spatialViewBox} aria-label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} shapeRendering="geometricPrecision">
+                background={{ url: tissueImage, previewUrl: previewImage, width: imageWidth, height: imageHeight, opacity: imageOpacity / 100 }} /> : <svg className="size-full overflow-visible" viewBox={spatialViewBox} aria-hidden="true" shapeRendering="geometricPrecision">
                 {spatialPanel}
               </svg>}
             </div>
 
-            <figure className="absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-md border border-rule bg-panel/95 px-3 py-2.5 shadow-[0_2px_8px_rgba(29,26,24,0.08)]">
-              {displayMode === 'gene' ? (
-                <>
-                  <figcaption className="flex items-baseline justify-between gap-6 text-[13px]">
-                    <span className="gene font-medium">{selectedGene}</span>
-                    <span className="text-xs text-ink-3">{geneError ? 'Unavailable' : geneLoading || (isHd && !geneValues) ? 'Loading…' : `${data.dataset.expression.assay}/${data.dataset.expression.layer}`}</span>
-                  </figcaption>
-                  <div className="mt-2 h-2 w-52 max-w-full rounded-[2px]" style={{ background: gradientCss }} />
-                  <div className="mt-1 flex justify-between font-mono text-xs tabular-nums text-ink-2"><span>0</span><span>{geneLoading || (isHd && !geneValues) ? '–' : `${colorCeiling.toFixed(2)}${hasManualMax ? '' : ' (P95)'}`}</span></div>
-                  <p className="mt-1.5 max-w-52 text-xs leading-4 text-ink-3">{hasManualMax ? 'Manual maximum.' : '95th percentile of expressing cells.'} Higher values use the top color and are drawn on top.</p>
-                </>
-              ) : (
-                <ul className="grid gap-1.5" aria-label="Identity legend">
-                  {legendIdentities.map((identity) => (
-                    <li key={identity} className="flex items-center gap-2 text-[13px] leading-4">
-                      <i className="size-2.5 shrink-0 rounded-full" style={{ background: getIdentityColor(identity) }} aria-hidden="true" />
-                      <span className="font-medium">{identity}</span>
-                      {identityNames[identity] && <span className="hidden text-ink-3 sm:inline">{identityNames[identity]}</span>}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </figure>
-            <p className="pointer-events-none absolute right-3 top-3 hidden rounded-md bg-panel/90 px-2 py-1 text-xs text-ink-2 sm:block">{formatNumber(filteredSpots.length)} {observationPlural} · drag to pan, scroll to zoom</p>
+            <details open={legendOpen} onToggle={(event) => setLegendOpen(event.currentTarget.open)}
+              className="group absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-md border border-rule bg-panel/95 shadow-[0_2px_8px_rgba(29,26,24,0.08)]">
+              <summary onPointerDown={(event) => event.stopPropagation()}
+                className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-[13px] pointer-coarse:min-h-10 [&::-webkit-details-marker]:hidden">
+                {displayMode === 'gene' ? (
+                  <><span className="gene font-medium">{selectedGene}</span><span className="h-2 w-12 rounded-[2px]" style={{ background: gradientCss }} aria-hidden="true" /></>
+                ) : (
+                  <><span className="font-medium">Legend</span><span className="flex gap-1" aria-hidden="true">{legendIdentities.slice(0, 6).map((identity) => <i key={identity} className="size-2 rounded-full" style={{ background: getIdentityColor(identity) }} />)}</span></>
+                )}
+                <ChevronDown className="ml-auto size-3.5 text-ink-3 transition-transform group-open:rotate-180" aria-hidden="true" />
+              </summary>
+              <div className="px-3 pb-2.5">
+                {displayMode === 'gene' ? (
+                  <>
+                    <p className="text-xs text-ink-3">{geneError ? 'Unavailable' : geneLoading || (isHd && !geneValues) ? 'Loading…' : `${data.dataset.expression.assay}/${data.dataset.expression.layer}`}</p>
+                    <div className="mt-1.5 h-2 w-52 max-w-full rounded-[2px]" style={{ background: gradientCss }} />
+                    <div className="mt-1 flex justify-between font-mono text-xs tabular-nums text-ink-2"><span>0</span><span>{geneLoading || (isHd && !geneValues) ? '–' : `${colorCeiling.toFixed(2)}${hasManualMax ? '' : ' (P95)'}`}</span></div>
+                    {selectedStats && <p className="mt-1.5 max-w-52 text-xs leading-4 text-ink-2">Detected in {formatNumber(selectedStats.detected)} of {formatNumber(data.spots.length)} {observationPlural} ({(detectedShare * 100).toFixed(detectedShare < 0.1 ? 1 : 0)}%).</p>}
+                    <p className="mt-1 max-w-52 text-xs leading-4 text-ink-3">{hasManualMax ? 'Manual maximum.' : `95th percentile of expressing ${observationPlural}.`} Higher values use the top color and are drawn on top.</p>
+                  </>
+                ) : (
+                  <ul className="grid gap-1.5" aria-label="Identity legend">
+                    {legendIdentities.map((identity) => (
+                      <li key={identity} className="flex items-center gap-2 text-[13px] leading-4">
+                        <i className="size-2.5 shrink-0 rounded-full" style={{ background: getIdentityColor(identity) }} aria-hidden="true" />
+                        <span className="font-medium">{identity}</span>
+                        {identityNames[identity] && <span className="text-ink-3">{identityNames[identity]}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </details>
+            {selectedSpot && <div className="absolute inset-x-3 top-3 z-10 flex items-center gap-2 rounded-md border border-rule bg-panel/95 py-1 pl-3 pr-1 text-[13px] shadow-[0_2px_8px_rgba(29,26,24,0.08)] sm:right-auto xl:hidden">
+              <i className="size-2.5 shrink-0 rounded-full" style={{ background: getIdentityColor(selectedSpot.identity) }} aria-hidden="true" />
+              <span className="font-medium">{selectedSpot.identity}</span>
+              <span className="truncate text-ink-2"><span className="gene">{selectedGene}</span> {selectedValueText}</span>
+              <a href="#inspector" onPointerDown={(event) => event.stopPropagation()} className="ml-auto shrink-0 px-1 text-plum underline underline-offset-2 pointer-coarse:py-2.5">Details</a>
+              <button aria-label="Clear selection" onPointerDown={(event) => event.stopPropagation()} onClick={() => setSelectedSpot(null)}
+                className="grid size-7 shrink-0 place-items-center rounded text-ink-3 hover:bg-ground hover:text-ink pointer-coarse:size-10"><X className="size-4" /></button>
+            </div>}
+            <p className={`pointer-events-none absolute right-3 top-3 rounded-md bg-panel/90 px-2 py-1 text-xs text-ink-2 ${selectedSpot ? 'hidden xl:block' : 'hidden sm:block'}`}>{formatNumber(filteredSpots.length)} {observationPlural}{screen.wide ? ' · drag to pan, scroll to zoom' : ''}</p>
           </div>
         </section>
 
@@ -877,8 +1000,11 @@ export default function Home() {
             {umapPanel}
           </section>
 
-          <section className="px-4 py-3.5" aria-labelledby="inspector-heading">
-            <h2 id="inspector-heading" className="mb-2 text-sm font-semibold">Selected {observationSingular}</h2>
+          <section id="inspector" className="scroll-mt-4 px-4 py-3.5" aria-labelledby="inspector-heading">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 id="inspector-heading" className="text-sm font-semibold">Selected {observationSingular}</h2>
+              {selectedSpot && <button onClick={() => setSelectedSpot(null)} className="rounded px-1 text-xs text-ink-2 underline underline-offset-2 hover:text-ink pointer-coarse:py-2.5">Clear</button>}
+            </div>
             {selectedSpot ? (
               <div className="space-y-3">
                 <div className="flex items-start gap-2.5">
@@ -894,7 +1020,7 @@ export default function Home() {
                   <Reading label="UMIs" value={formatNumber(selectedSpot.counts)} />
                   <Reading label="Genes" value={formatNumber(selectedSpot.features)} />
                   <Reading label="Mito" value={`${selectedSpot.mito.toFixed(1)}%`} />
-                  <Reading label={<span className="gene">{selectedGene}</span>} value={selectedValue !== null ? selectedValue.toFixed(2) : geneError ? 'Unavailable' : '…'} accent />
+                  <Reading label={<span className="gene">{selectedGene}</span>} value={selectedValueText} accent />
                 </dl>
                 {selectedSpot.expression && <div>
                   <p className="mb-2 text-xs font-medium text-ink-2">Featured genes</p>
@@ -912,7 +1038,7 @@ export default function Home() {
                 </div>}
               </div>
             ) : (
-              <p className="text-[13px] leading-5 text-ink-2">Click a {observationSingular} in the tissue or the UMAP to see its identity, cluster, QC values, and <span className="gene">{selectedGene}</span> expression.</p>
+              <p className="text-[13px] leading-5 text-ink-2">{verb} a {observationSingular} in the tissue or the UMAP to see its identity, cluster, QC values, and <span className="gene">{selectedGene}</span> expression.</p>
             )}
           </section>
 
@@ -931,6 +1057,9 @@ export default function Home() {
   );
 }
 
+// The tissue view handles its own arrow keys, like a map, so it takes the application role.
+const applicationRole = { role: 'application', tabIndex: 0 } as const;
+
 const zoneOrder = ['OPZ', 'IQZ', 'HCZ'];
 function zoneRank(identity: string) {
   const index = zoneOrder.indexOf(identity);
@@ -938,7 +1067,7 @@ function zoneRank(identity: string) {
 }
 
 function toggleClass(active: boolean) {
-  return `h-7 rounded-md border px-2.5 text-xs font-medium tabular-nums transition-colors ${active ? 'border-plum bg-plum text-white' : 'border-rule-strong bg-white text-ink-2 hover:border-ink-3 hover:text-ink'}`;
+  return `h-7 pointer-coarse:h-10 rounded-md border px-2.5 text-xs font-medium tabular-nums transition-colors ${active ? 'border-plum bg-plum text-white' : 'border-rule-strong bg-white text-ink-2 hover:border-ink-3 hover:text-ink'}`;
 }
 
 // The gGBO zones from rim to core: OPZ, IQZ, HCZ.
@@ -954,7 +1083,7 @@ function ZoneMark({ className = '' }: { className?: string }) {
 
 function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1.5">
+    <div className="min-w-0 space-y-1.5">
       <label className="control-label block" htmlFor={htmlFor}>{label}</label>
       {children}
     </div>

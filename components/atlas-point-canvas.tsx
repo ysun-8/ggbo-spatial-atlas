@@ -8,10 +8,12 @@ type Props = {
   points: Point[]; colors: Map<string, string>; viewBox: string;
   radius: number; opacity: number; selectedId?: string;
   label: string; className?: string; onSelect?: (id: string) => void; onKeyboardSelect?: (id: string) => void;
+  // When false, a parent element owns keyboard access and this canvas is decorative to assistive tech.
+  interactive?: boolean;
   background?: { url: string; previewUrl?: string; width: number; height: number; opacity: number };
 };
 
-export function AtlasPointCanvas({ points, colors, viewBox, radius, opacity, selectedId, label, className, onSelect, onKeyboardSelect, background }: Props) {
+export function AtlasPointCanvas({ points, colors, viewBox, radius, opacity, selectedId, label, className, onSelect, onKeyboardSelect, background, interactive = true }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [revision, setRevision] = useState(0);
   const selected = useMemo(() => points.find((point) => point.id === selectedId), [points, selectedId]);
@@ -54,9 +56,12 @@ export function AtlasPointCanvas({ points, colors, viewBox, radius, opacity, sel
       event.clientX - rect.left, event.clientY - rect.top, radius);
   };
   // A keyboard-controlled plot uses application semantics and arrow-key navigation.
-  // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex
-  return <div className={`relative overflow-hidden ${className ?? ''}`} role="application" tabIndex={0} aria-label={`${label}. Use arrow keys to select cells.`} data-point-count={points.length}
+  const keyboard = interactive ? { role: 'application', tabIndex: 0, 'aria-label': `${label}. Use arrow keys to select cells.` } : { 'aria-hidden': true };
+  // Pointer picking works the same either way; the parent provides keyboard access when this is not interactive.
+  // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-static-element-interactions
+  return <div className={`relative overflow-hidden ${className ?? ''}`} {...keyboard} data-point-count={points.length}
     onKeyDown={(event) => {
+      if (!interactive) return;
       if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(event.key) || !points.length) return;
       event.preventDefault();
       const index = points.findIndex((point) => point.id === selectedId);

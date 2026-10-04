@@ -145,6 +145,22 @@ body {
   box-shadow: 0 1px 3px rgb(29 26 24 / 30%);
 }
 
+@media (pointer: coarse) {
+  .atlas-range {
+    height: 6px;
+  }
+
+  .atlas-range::-webkit-slider-thumb {
+    width: 24px;
+    height: 24px;
+  }
+
+  .atlas-range::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+  }
+}
+
 .atlas-range:focus-visible {
   outline: 2px solid var(--atlas-plum);
   outline-offset: 4px;
@@ -162,7 +178,8 @@ body {
 }
 
 :focus-visible {
-  outline-color: var(--atlas-plum);
+  outline: 2px solid var(--atlas-plum);
+  outline-offset: 2px;
 }
 
 button,
