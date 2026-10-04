@@ -116,8 +116,6 @@ const identityNames: Record<string, string> = {
 };
 
 const fallbackIdentityColors = ['#e07b25', '#8e5bb5', '#16a3b0', '#8c564b', '#c9b11a'];
-// Cells with no detected expression stay neutral so expressing cells stand out.
-const notDetectedColor = 'rgba(150, 150, 150, 0.4)';
 const minZoom = 0.8;
 const regularMaxZoom = 3;
 const hdMaxZoom = 20;
@@ -143,9 +141,9 @@ const gradientOptions = [
     stops: ['#440154', '#3b528b', '#21918c', '#5ec962', '#fde725'],
   },
   {
-    // Grey to magenta, as in manuscript Figure 2H.
-    id: 'figure',
-    label: 'Figure 2H',
+    // Grey to magenta, as in the manuscript's gene panels.
+    id: 'magenta',
+    label: 'Magenta',
     stops: ['#d3d3d3', '#b4209d'],
   },
   {
@@ -434,9 +432,7 @@ export default function Home() {
   const spotColors = useMemo(() => new Map(filteredSpots.map((spot) => {
     if (displayMode === 'identity') return [spot.id, getIdentityColor(spot.identity)] as const;
     if (!geneColorsReady) return [spot.id, '#b5b5b5'] as const;
-    const value = expressionOf(spot);
-    if (!(value > 0)) return [spot.id, notDetectedColor] as const;
-    return [spot.id, interpolateColor(value / (activeCeiling || 1), gradientId)] as const;
+    return [spot.id, interpolateColor(expressionOf(spot) / (activeCeiling || 1), gradientId)] as const;
   })), [filteredSpots, displayMode, getIdentityColor, geneColorsReady, expressionOf, activeCeiling, gradientId]);
 
   // In gene mode, draw low expression first so the highest-expressing cells sit on top.
@@ -857,8 +853,7 @@ export default function Home() {
                   </figcaption>
                   <div className="mt-2 h-2 w-52 max-w-full rounded-[2px]" style={{ background: gradientCss }} />
                   <div className="mt-1 flex justify-between font-mono text-[11px] tabular-nums text-ink-2"><span>0</span><span>{geneLoading || (isHd && !geneValues) ? '–' : `${colorCeiling.toFixed(2)}${hasManualMax ? '' : ' (P95)'}`}</span></div>
-                  <p className="mt-1.5 flex max-w-52 items-center gap-1.5 text-[11px] leading-4 text-ink-3"><i className="size-2 shrink-0 rounded-full" style={{ background: notDetectedColor }} aria-hidden="true" />Not detected</p>
-                  <p className="mt-1 max-w-52 text-[11px] leading-4 text-ink-3">{hasManualMax ? 'Manual maximum.' : '95th percentile of expressing cells.'} Higher values use the top color and are drawn on top.</p>
+                  <p className="mt-1.5 max-w-52 text-[11px] leading-4 text-ink-3">{hasManualMax ? 'Manual maximum.' : '95th percentile of expressing cells.'} Higher values use the top color and are drawn on top.</p>
                 </>
               ) : (
                 <ul className="grid gap-1.5" aria-label="Identity legend">
