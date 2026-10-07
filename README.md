@@ -1,10 +1,10 @@
 # gGBO Spatial Atlas
 
-An interactive viewer for spatial transcriptomics from giant glioblastoma organoids (gGBOs) and primary GBM tissue.
+An interactive viewer for spot-level and single-cell resolution spatial transcriptomics from giant glioblastoma organoids (gGBOs) and primary GBM tissue.
 
-**Open the atlas:** https://ysun-8.github.io/ggbo-spatial-atlas/
+**Atlas link:** https://ysun-8.github.io/ggbo-spatial-atlas/
 
-gGBOs form a hypoxia gradient from the rim to the core, and their tumor cells organize into three zones along it. The atlas lets you explore these zones, and how they respond to treatment, on the H&E of each section.
+gGBOs spontaneously form a hypoxia gradient from the rim to the core, and the gradient spatially organizes tumor cells into distinct zones. The atlas lets you explore these zones and how they respond to treatment on the H&E of each section.
 
 ## What's included
 
@@ -15,7 +15,7 @@ gGBOs form a hypoxia gradient from the rim to the core, and their tumor cells or
 | **gGBOs** | Visium HD<br>fresh-frozen | 4 patient lines<br>109,755 cells | Baseline (20% O2)<br>5% O2<br>CAR-T |
 | **Primary GBM** | Visium HD<br>FFPE | 4 surgical samples<br>343,558 cells | Untreated |
 
-Every dataset includes all spots or cells and all genes from its source Seurat object. Counts for each line and sample are in [docs/DATASETS.md](docs/DATASETS.md).
+Every dataset includes all spots or cells and all genes from its source Seurat object (v5, R). Counts for each line and sample are in [docs/DATASETS.md](docs/DATASETS.md).
 
 ## Using the atlas
 
@@ -47,11 +47,3 @@ Labels come from clustering in each source object. Hover over a label in the leg
 ## Citation
 
 A manuscript describing this work is under review. Citation details will be added when it is published.
-
-## Contact
-
-Please report problems or ask questions through [GitHub issues](https://github.com/ysun-8/ggbo-spatial-atlas/issues).
-
-## License
-
-MIT.
