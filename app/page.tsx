@@ -207,7 +207,7 @@ export default function Home() {
   const [gradientId, setGradientId] = useState<GradientId>('viridis');
   const [imageOpacity, setImageOpacity] = useState(50);
   const [spotOpacity, setSpotOpacity] = useState(80);
-  const [hdDotSize, setHdDotSize] = useState(40);
+  const [hdDotSize, setHdDotSize] = useState(65);
   const requestedView = useRef<ReturnType<typeof readView> | null>(null);
   useEffect(() => {
     // The URL is only readable after hydration, so the view is restored here once.
@@ -655,7 +655,7 @@ export default function Home() {
   const viewQuery = writeView({ dataset: datasetId, capture: selectedCaptureId, line: lineFilter, gene: selectedGene, mode: displayMode,
     max: hasManualMax ? String(parsedMax) : '', cmap: gradientId === 'viridis' ? '' : gradientId,
     he: imageOpacity === 50 ? '' : String(imageOpacity), dots: spotOpacity === 80 ? '' : String(spotOpacity),
-    dot: data?.dataset.kind === 'hd' && hdDotSize !== 40 ? String(hdDotSize) : '',
+    dot: data?.dataset.kind === 'hd' && hdDotSize !== 65 ? String(hdDotSize) : '',
     zoom: isDefaultCamera ? '' : `${camera.scale.toFixed(2)},${Math.round(center.cx)},${Math.round(center.cy)}`,
     cell: selectedSpot?.id ?? '' });
   useEffect(() => {
