@@ -15,10 +15,10 @@ type Props = {
 
 export function AtlasPointCanvas({ points, colors, viewBox, radius, opacity, selectedId, label, className, onSelect, onKeyboardSelect, background, interactive = true }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const [revision, setRevision] = useState(0);
+  const [size, setSize] = useState({ width: 0, height: 0 });
   const selected = useMemo(() => points.find((point) => point.id === selectedId), [points, selectedId]);
   useEffect(() => {
-    const observer = new ResizeObserver(() => setRevision((value) => value + 1));
+    const observer = new ResizeObserver(([entry]) => setSize({ width: entry.contentRect.width, height: entry.contentRect.height }));
     if (canvas.current) observer.observe(canvas.current);
     return () => observer.disconnect();
   }, []);
@@ -49,7 +49,7 @@ export function AtlasPointCanvas({ points, colors, viewBox, radius, opacity, sel
       element.dataset.drawCount = String(Number(element.dataset.drawCount ?? 0) + 1);
     });
     return () => cancelAnimationFrame(frame);
-  }, [points, colors, viewBox, radius, revision]);
+  }, [points, colors, viewBox, radius, size]);
   const pick = (event: React.PointerEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     return pickCanvasPoint(points, canvasProjection(viewBox, rect.width, rect.height),
@@ -82,7 +82,17 @@ export function AtlasPointCanvas({ points, colors, viewBox, radius, opacity, sel
     </svg>}
     <canvas ref={canvas} className="pointer-events-none absolute inset-0 size-full" style={{ opacity }} aria-hidden="true" />
     <svg className="pointer-events-none absolute inset-0 size-full" viewBox={viewBox} aria-hidden="true">
-      {selected && <circle cx={selected.x} cy={selected.y} r={radius * 1.5} fill={colors.get(selected.id)} stroke="white" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />}
+      {selected && <SelectedMarker x={selected.x} y={selected.y} radius={radius} fill={colors.get(selected.id)} unitsPerPixel={size.width ? 1 / canvasProjection(viewBox, size.width, size.height).scale : 0} />}
     </svg>
   </div>;
+}
+
+// The selected point keeps a ring of at least 7 px, so it stays findable at any zoom.
+export function SelectedMarker({ x, y, radius, fill, unitsPerPixel }: { x: number; y: number; radius: number; fill?: string; unitsPerPixel: number }) {
+  const ring = Math.max(radius * 1.6, 7 * unitsPerPixel);
+  return <g>
+    <circle cx={x} cy={y} r={ring} fill="none" stroke="white" strokeWidth={4} vectorEffect="non-scaling-stroke" />
+    <circle cx={x} cy={y} r={ring} fill="none" stroke="#1d1a18" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+    <circle cx={x} cy={y} r={Math.max(radius, 2.5 * unitsPerPixel)} fill={fill} />
+  </g>;
 }

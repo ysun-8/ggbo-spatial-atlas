@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Link2, Minus, Plus, RotateCcw, Search, X } from 'lucide-react';
 
-import { detectedCeiling, readView, writeView, assetPath, pinchCamera, parseZoom, cameraCenter, cameraForCenter } from '@/lib/atlas-display.mjs';
+import { detectedCeiling, readView, writeView, assetPath, pinchCamera, parseZoom, cameraCenter, cameraForCenter, fitCamera, sameCamera, datasetFamily } from '@/lib/atlas-display.mjs';
 import { nearestPoint, nextPointInDirection } from '@/lib/atlas-canvas.mjs';
 import { searchGenes } from '@/lib/atlas-genes.mjs';
-import { AtlasPointCanvas } from '@/components/atlas-point-canvas';
+import { AtlasPointCanvas, SelectedMarker } from '@/components/atlas-point-canvas';
 import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/native-select';
 import catalog from '@/atlas/catalog.json';
@@ -129,9 +129,11 @@ function publicPath(path: string, assetBase = '') {
 
 type DatasetEntry = (typeof catalog.datasets)[number] & { asset_base_url?: string };
 const datasetOptions: DatasetEntry[] = catalog.datasets;
+// Readers pick a data type, then a condition, then a line or sample. Labels stay as in the catalog.
 const datasetGroups = [...new Map(datasetOptions.map((entry) => [entry.navigation.group, {
-  id: entry.navigation.group, label: entry.navigation.label,
+  id: entry.navigation.group, label: entry.navigation.label, ...datasetFamily(entry.navigation.label),
 }])).values()];
+const datasetFamilies = [...new Set(datasetGroups.map((group) => group.family))];
 if (catalog.schema_version !== 2 || !datasetOptions.length || new Set(datasetOptions.map((entry) => entry.id)).size !== datasetOptions.length || !datasetOptions.some((entry) => entry.id === catalog.default_dataset)) {
   throw new Error('Invalid dataset catalog');
 }
@@ -199,6 +201,12 @@ export default function Home() {
     const next = entries.find((entry) => entry.navigation.line === selectedEntry.navigation.line) ?? entries[0];
     if (next) setDatasetId(next.id);
   };
+  const selectedGroup = datasetGroups.find((group) => group.id === selectedEntry.navigation.group)!;
+  const familyGroups = datasetGroups.filter((group) => group.family === selectedGroup.family);
+  const selectFamily = (family: string) => {
+    const groups = datasetGroups.filter((group) => group.family === family);
+    selectGroup((groups.find((group) => group.condition === selectedGroup.condition) ?? groups[0]).id);
+  };
   const [selectedCaptureId, setSelectedCaptureId] = useState('');
   const activeCapture = data?.dataset.captures.find((capture) => capture.id === selectedCaptureId) ?? data?.dataset.captures[0];
   const [selectedGene, setSelectedGene] = useState('CA9');
@@ -243,6 +251,10 @@ export default function Home() {
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const maxZoom = data?.dataset.kind === 'hd' ? hdMaxZoom : regularMaxZoom;
   const [camera, setCamera] = useState({ x: 0, y: 0, scale: 1 });
+  // Home frames the shown cells; it is refit when the panel resizes while the reader is still there.
+  const [home, setHome] = useState<typeof camera | null>(null);
+  const wantHome = useRef(true);
+  const lastTap = useRef<{ time: number; x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [search, setSearch] = useState('');
   const [legendOpen, setLegendOpen] = useState(true);
@@ -296,9 +308,8 @@ export default function Home() {
     if (!urlReady) return;
     const selectedDataset = datasetOptions.find((dataset) => dataset.id === datasetId) ?? datasetOptions[0];
     const controller = new AbortController();
-    // Clear stale dataset controls while the replacement request is in flight.
+    // The previous dataset stays on screen until the next one arrives.
     // oxlint-disable-next-line react/react-compiler
-    setData(null);
     setDatasetError(false);
     fetch(publicPath(selectedDataset.path, selectedDataset.asset_base_url), { signal: controller.signal })
       .then((response) => {
@@ -343,6 +354,8 @@ export default function Home() {
       setGeneLoading(false);
         setLineFilter(view && payload.dataset.lines.includes(view.line) ? view.line : payload.dataset.lines.length === 1 ? payload.dataset.lines[0] : 'all');
         setSelectedSpot(view?.cell ? payload.spots.find((spot) => spot.id === view.cell) ?? null : null);
+        wantHome.current = !pendingZoom.current;
+        setHome(null);
         setCamera({ x: 0, y: 0, scale: 1 });
         setSearch('');
       })
@@ -418,10 +431,18 @@ export default function Home() {
     return data.dataset.lines.filter((line) => present.has(line));
   }, [data, activeCapture]);
 
-  const pickGene = (gene: string) => {
+  // On phones the controls sit below the tissue, so a choice scrolls back up to show its result.
+  const revealTissue = () => {
+    if (!window.matchMedia('(max-width: 767px)').matches) return;
+    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.getElementById('tissue')?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
+  };
+  const pickGene = (gene: string, notice = '') => {
     setSelectedGene(gene);
     setDisplayMode('gene');
-    setGeneNotice('');
+    setGeneNotice(notice);
+    setSearch('');
+    revealTissue();
   };
 
   const automaticCeiling = useMemo(() => {
@@ -440,7 +461,7 @@ export default function Home() {
     const term = search.trim();
     if (!term) return;
     const top = geneSearch.exact || matchingGenes.length === 1 ? matchingGenes[0] : undefined;
-    if (top) { pickGene(top.gene); setSearchMiss(''); }
+    if (top) { pickGene(top.gene, geneSearch.alias?.gene === top.gene ? `${term} is ${top.gene}.` : ''); setSearchMiss(''); }
     else setSearchMiss(term);
   };
   const visibleGenes = matchingGenes.slice(0, search ? 60 : 12);
@@ -485,6 +506,11 @@ export default function Home() {
     });
   };
 
+  const zoomAtPoint = (element: HTMLElement, clientX: number, clientY: number, factor: number) => {
+    const cursor = panelOffset(element, clientX, clientY);
+    setCamera((current) => zoomCameraAt(current, cursor, factor, maxZoom));
+  };
+
   // React registers wheel listeners as passive, so preventDefault only works on a native listener.
   const spatialPanelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -494,21 +520,15 @@ export default function Home() {
       if (!window.matchMedia('(min-width: 1280px)').matches && !event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
       if (dragStart.current) return;
-      const bounds = element.getBoundingClientRect();
-      const cursorX = event.clientX - bounds.left - bounds.width / 2;
-      const cursorY = event.clientY - bounds.top - bounds.height / 2;
-      setCamera((current) => {
-        const nextScale = Math.min(maxZoom, Math.max(minZoom, current.scale * Math.exp(-event.deltaY * 0.0015)));
-        const ratio = nextScale / current.scale;
-        return { x: cursorX - (cursorX - current.x) * ratio, y: cursorY - (cursorY - current.y) * ratio, scale: nextScale };
-      });
+      const cursor = panelOffset(element, event.clientX, event.clientY);
+      setCamera((current) => zoomCameraAt(current, cursor, Math.exp(-event.deltaY * 0.0015), maxZoom));
     };
     element.addEventListener('wheel', handleWheel, { passive: false });
     return () => element.removeEventListener('wheel', handleWheel);
   }, [data, maxZoom]);
 
-  // On touch screens, one-finger vertical swipes scroll the page (touch-action: pan-y),
-  // one-finger horizontal drags pan the image, and two fingers pinch to zoom.
+  // On touch screens, two fingers pinch to zoom. At the home view one-finger vertical swipes
+  // scroll the page (touch-action: pan-y); once zoomed in, one finger pans the image freely.
   const touches = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ x: number; y: number; distance: number; camera: typeof camera } | null>(null);
   const touchGesture = (element: HTMLElement) => {
@@ -589,6 +609,14 @@ export default function Home() {
       const clickedSpot = data?.spots.find((spot) => spot.id === clickedSpotId);
       if (clickedSpot) setSelectedSpot(clickedSpot);
     }
+    // A double click or double tap zooms in at that point; with Shift it zooms out.
+    if (event.type !== 'pointercancel' && !didDrag.current) {
+      const tap = lastTap.current;
+      if (tap && event.timeStamp - tap.time < 350 && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) < 24) {
+        zoomAtPoint(event.currentTarget, event.clientX, event.clientY, event.shiftKey ? 0.5 : 2);
+        lastTap.current = null;
+      } else lastTap.current = { time: event.timeStamp, x: event.clientX, y: event.clientY };
+    }
     dragStart.current = null;
     setIsDragging(false);
     window.setTimeout(() => { didDrag.current = false; }, 0);
@@ -638,18 +666,28 @@ export default function Home() {
   const imageSize = { width: imageWidth, height: imageHeight };
 
   useEffect(() => {
-    const zoom = pendingZoom.current;
     const element = spatialViewport.current;
     // Measure directly: resize callbacks don't arrive while the page is in a background tab.
     const panel = viewportSize.width ? viewportSize : element ? { width: element.clientWidth, height: element.clientHeight } : null;
-    if (!zoom || !panel?.width || !activeCapture) return;
-    pendingZoom.current = null;
-    // oxlint-disable-next-line react/react-compiler
-    setCamera(cameraForCenter(zoom, Math.min(maxZoom, Math.max(minZoom, zoom.scale)), { width: activeCapture.width, height: activeCapture.height }, panel));
-  }, [viewportSize, activeCapture, maxZoom]);
+    if (!panel?.width || !activeCapture) return;
+    const image = { width: activeCapture.width, height: activeCapture.height };
+    const zoom = pendingZoom.current;
+    if (zoom) {
+      pendingZoom.current = null;
+      // oxlint-disable-next-line react/react-compiler
+      setCamera(cameraForCenter(zoom, Math.min(maxZoom, Math.max(minZoom, zoom.scale)), image, panel));
+      return;
+    }
+    if (!wantHome.current && camera !== home) return;
+    wantHome.current = false;
+    const next = fitCamera(filteredSpots, image, panel, maxZoom);
+    if (home && camera === home && sameCamera(next, home)) return;
+    setHome(next);
+    setCamera(next);
+  }, [viewportSize, activeCapture, maxZoom, filteredSpots, camera, home]);
 
   // Everything needed to reopen this exact view; defaults are left out to keep links short.
-  const isDefaultCamera = camera.scale === 1 && camera.x === 0 && camera.y === 0;
+  const isDefaultCamera = home !== null && camera === home;
   const panelSize = { width: panelWidth, height: panelHeight };
   const center = cameraCenter(camera, imageSize, panelSize);
   const viewQuery = writeView({ dataset: datasetId, capture: selectedCaptureId, line: lineFilter, gene: selectedGene, mode: displayMode,
@@ -665,9 +703,22 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [urlReady, data, datasetId, viewQuery]);
 
-  const zoomIn = () => zoomAtCenter(isHd ? camera.scale * 1.25 : camera.scale + 0.2);
-  const zoomOut = () => zoomAtCenter(isHd ? camera.scale / 1.25 : camera.scale - 0.2);
-  const resetView = () => setCamera({ x: 0, y: 0, scale: 1 });
+  const zoomIn = () => zoomAtCenter(isHd ? camera.scale * 1.5 : camera.scale + 0.2);
+  const zoomOut = () => zoomAtCenter(isHd ? camera.scale / 1.5 : camera.scale - 0.2);
+  const resetView = () => { wantHome.current = true; setCamera((current) => ({ ...current })); };
+
+  // Selecting from the UMAP or the keyboard brings the cell into view if it is off screen.
+  const revealSpot = useCallback((spot: Spot) => {
+    setSelectedSpot(spot);
+    setCamera((current) => {
+      const image = { width: imageWidth, height: imageHeight };
+      const panel = { width: panelWidth, height: panelHeight };
+      const units = Math.max(imageWidth / panelWidth, imageHeight / panelHeight) / current.scale;
+      const { cx, cy } = cameraCenter(current, image, panel);
+      const onScreen = Math.abs(spot.x - cx) < panelWidth * units * 0.45 && Math.abs(spot.y - cy) < panelHeight * units * 0.45;
+      return onScreen ? current : cameraForCenter({ cx: spot.x, cy: spot.y }, current.scale, image, panel);
+    });
+  }, [imageWidth, imageHeight, panelWidth, panelHeight, setSelectedSpot]);
 
   // Arrow keys step to the nearest cell in that direction and keep it on screen.
   const handlePlateKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -682,10 +733,7 @@ export default function Home() {
     const next = current
       ? nextPointInDirection(filteredSpots, current, event.key)
       : nearestPoint(filteredSpots, viewX + viewWidth / 2, viewY + viewHeight / 2);
-    if (!next) return;
-    setSelectedSpot(next);
-    const onScreen = next.x >= viewX && next.x <= viewX + viewWidth && next.y >= viewY && next.y <= viewY + viewHeight;
-    if (!onScreen) setCamera(cameraForCenter({ cx: next.x, cy: next.y }, camera.scale, imageSize, panelSize));
+    if (next) revealSpot(next);
   };
   const activeGradient = gradientOptions.find((option) => option.id === gradientId) ?? gradientOptions[0];
   const gradientCss = `linear-gradient(90deg, ${activeGradient.stops.join(', ')})`;
@@ -720,17 +768,20 @@ export default function Home() {
   const umapPanel = useMemo(() => useCanvas ? (
     <AtlasPointCanvas points={umapPoints} colors={spotColors} viewBox="0 0 240 180" radius={1} opacity={0.76} interactive={false}
       selectedId={selectedSpot?.id} label={`UMAP of ${observationPlural}`} className="w-full aspect-[4/3] rounded-md bg-ground"
-      onSelect={(id) => { const spot = filteredSpots.find((point) => point.id === id); if (spot) setSelectedSpot(spot); }} />
+      onSelect={(id) => { const spot = filteredSpots.find((point) => point.id === id); if (spot) revealSpot(spot); }} />
   ) : (
     <svg viewBox="0 0 240 180" className="w-full rounded-md bg-ground" aria-label={`UMAP of ${observationPlural}`} shapeRendering="geometricPrecision">
       {umapBounds && drawnSpots.map((spot) => {
         const x = 14 + ((spot.umap_x - umapBounds.minX) / (umapBounds.maxX - umapBounds.minX || 1)) * 212;
         const y = 166 - ((spot.umap_y - umapBounds.minY) / (umapBounds.maxY - umapBounds.minY || 1)) * 152;
-        const isSelected = selectedSpot?.id === spot.id;
-        return <circle key={spot.id} cx={x} cy={y} r={isSelected ? (isHd ? 3.2 : 4.5) : (isHd ? 1 : 1.8)} fill={spotColors.get(spot.id)} opacity={isSelected ? 1 : 0.76} stroke={isSelected ? '#fff' : 'none'} strokeWidth={isHd ? 1.2 : 2} vectorEffect="non-scaling-stroke" onClick={() => setSelectedSpot(spot)} className="cursor-pointer" />;
+        return <circle key={spot.id} cx={x} cy={y} r={isHd ? 1 : 1.8} fill={spotColors.get(spot.id)} opacity={0.76} onClick={() => revealSpot(spot)} className="cursor-pointer" />;
       })}
+      {umapBounds && selectedSpot && filteredSpots.some((spot) => spot.id === selectedSpot.id) && <SelectedMarker
+        x={14 + ((selectedSpot.umap_x - umapBounds.minX) / (umapBounds.maxX - umapBounds.minX || 1)) * 212}
+        y={166 - ((selectedSpot.umap_y - umapBounds.minY) / (umapBounds.maxY - umapBounds.minY || 1)) * 152}
+        radius={1.8} fill={spotColors.get(selectedSpot.id)} unitsPerPixel={0.9} />}
     </svg>
-  ), [useCanvas, umapPoints, observationPlural, umapBounds, drawnSpots, filteredSpots, selectedSpot, isHd, spotColors, setSelectedSpot]);
+  ), [useCanvas, umapPoints, observationPlural, umapBounds, drawnSpots, filteredSpots, selectedSpot, isHd, spotColors, revealSpot]);
 
   const viewLabel = `${selectedEntry.navigation.label}${selectedEntry.navigation.line ? ` · ${selectedEntry.navigation.line}` : ''}`;
 
@@ -762,7 +813,7 @@ export default function Home() {
   const selectedStats = data.genes.find((gene) => gene.gene === selectedGene);
   const detectedShare = selectedStats ? selectedStats.detected / Math.max(1, data.spots.length) : 0;
   const verb = screen.coarse ? 'Tap' : 'Click';
-  const zoomHint = screen.coarse ? ' Pinch to zoom.' : screen.wide ? '' : ' Hold Ctrl or ⌘ and scroll to zoom.';
+  const zoomHint = screen.coarse ? 'Double-tap or pinch to zoom.' : screen.wide ? 'Drag to pan; scroll or double-click to zoom.' : 'Drag to pan; double-click, or hold Ctrl or ⌘ and scroll, to zoom.';
   const announcement = selectedSpot ? `Selected ${selectedSpot.identity} ${observationSingular}. ${selectedGene} ${selectedValueText}.` : '';
 
   return (
@@ -774,39 +825,50 @@ export default function Home() {
           <ZoneMark className="size-8 shrink-0" />
           <div className="min-w-0">
             <h1 className="text-[17px] font-semibold leading-6 tracking-[-0.01em]">{catalog.site.title}</h1>
-            <p className="truncate text-xs leading-4 text-ink-3">{viewLabel}</p>
+            <p className="hidden truncate text-xs leading-4 text-ink-3 md:block">{viewLabel}</p>
           </div>
         </div>
         <div className="ml-auto flex items-center gap-4 text-xs">
-          <span className="hidden tabular-nums text-ink-2 md:inline">{formatNumber(data.dataset.spot_count)} {observationPlural}</span>
-          <a className="text-ink underline decoration-rule-strong underline-offset-[3px] hover:decoration-plum" href={publicPath('/about.html')} target="_blank" rel="noreferrer">Methods &amp; source</a>
-          <button className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rule-strong bg-white px-2.5 font-medium text-ink transition-colors hover:border-ink-3 pointer-coarse:h-10" onClick={async () => {
+          <a className="text-ink underline decoration-rule-strong underline-offset-[3px] hover:decoration-plum" href={publicPath('/about.html')}><span className="sm:hidden">Methods</span><span className="hidden sm:inline">Methods &amp; source</span></a>
+          <button aria-label="Copy link to this view" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rule-strong bg-white px-2.5 font-medium text-ink transition-colors hover:border-ink-3 pointer-coarse:h-10" onClick={async () => {
             try { await navigator.clipboard.writeText(window.location.origin + window.location.pathname + viewQuery + window.location.hash); setShareStatus('Link copied'); }
             catch { setShareStatus('Copy from address bar'); }
             window.setTimeout(() => setShareStatus('Copy link'), 3000);
-          }}><Link2 className="size-3.5 text-ink-3" aria-hidden="true" /><span aria-live="polite">{shareStatus}</span></button>
+          }}><Link2 className="size-3.5 text-ink-3" aria-hidden="true" /><span aria-live="polite" className={shareStatus === 'Copy link' ? 'hidden sm:inline' : ''}>{shareStatus}</span></button>
         </div>
       </header>
 
-      {/* Phones get the dataset and gene above the tissue; tablets get two columns and wide screens three. */}
-      <div className="grid flex-1 grid-cols-1 [grid-template-areas:'data'_'view'_'color'_'side'] md:grid-cols-[272px_minmax(0,1fr)] md:[grid-template-areas:'data_view'_'color_side'] xl:min-h-0 xl:grid-cols-[264px_minmax(520px,1fr)_288px] xl:grid-rows-[auto_minmax(0,1fr)] xl:[grid-template-areas:'data_view_side'_'color_view_side']">
-        <section aria-label="Dataset and gene" className="grid grid-cols-2 content-start gap-3 border-b border-rule bg-panel px-4 py-3.5 [grid-area:data] md:grid-cols-1 md:border-r">
-          <Field label="Dataset" htmlFor="dataset-group">
-            <NativeSelect id="dataset-group" className="w-full bg-white" value={selectedEntry.navigation.group} onChange={(event) => selectGroup(event.target.value)}>
-              <optgroup label="Visium">
-                {datasetGroups.filter((group) => !group.id.startsWith('hd-')).map((group) => <option key={group.id} value={group.id}>{group.label.replace('Visium · ', '')}</option>)}
-              </optgroup>
-              <optgroup label="Visium HD">
-                {datasetGroups.filter((group) => group.id.startsWith('hd-')).map((group) => <option key={group.id} value={group.id}>{group.label}</option>)}
-              </optgroup>
+      {/* Phones show the tissue first with a one-line summary; tablets get two columns and wide screens three. */}
+      <div className="grid flex-1 grid-cols-1 [grid-template-areas:'summary'_'view'_'data'_'color'_'side'] md:grid-cols-[272px_minmax(0,1fr)] md:[grid-template-areas:'data_view'_'color_side'] xl:min-h-0 xl:grid-cols-[264px_minmax(520px,1fr)_288px] xl:grid-rows-[auto_minmax(0,1fr)] xl:[grid-template-areas:'data_view_side'_'color_view_side']">
+        <div className="flex items-center gap-3 border-b border-rule bg-panel px-4 py-2 [grid-area:summary] md:hidden">
+          <p className="min-w-0 flex-1 truncate text-[13px] text-ink-2">{viewLabel}{displayMode === 'gene' && <> · <span className="gene font-medium text-ink">{selectedGene}</span></>}</p>
+          <a href="#controls" className="shrink-0 py-2 text-[13px] font-medium text-plum underline underline-offset-2">Change</a>
+        </div>
+
+        <section id="controls" aria-label="Dataset and gene" className="grid scroll-mt-2 grid-cols-1 content-start gap-3 border-b border-rule bg-panel px-4 py-3.5 [grid-area:data] sm:grid-cols-2 md:grid-cols-1 md:border-r">
+          <Field label="Dataset" htmlFor="dataset-family">
+            <NativeSelect id="dataset-family" className="w-full bg-white" value={selectedGroup.family} onChange={(event) => { selectFamily(event.target.value); revealTissue(); }}>
+              {datasetFamilies.map((family) => <option key={family} value={family}>{family}</option>)}
             </NativeSelect>
           </Field>
 
-          {isHd && <Field label={lineLabel} htmlFor="hd-line">
-            <NativeSelect id="hd-line" className="w-full bg-white" value={datasetId} onChange={(event) => setDatasetId(event.target.value)}>
-              {groupEntries.map((entry) => <option key={entry.id} value={entry.id}>{entry.navigation.line}</option>)}
-            </NativeSelect>
-          </Field>}
+          {familyGroups.length > 1 && <fieldset className="m-0 min-w-0 border-0 p-0">
+            <legend className="control-label mb-1.5">Condition</legend>
+            <div className="flex flex-wrap gap-1.5">
+              {familyGroups.map((group) => (
+                <button key={group.id} className={toggleClass(group.id === selectedGroup.id)} aria-pressed={group.id === selectedGroup.id} onClick={() => { selectGroup(group.id); revealTissue(); }}>{group.condition}</button>
+              ))}
+            </div>
+          </fieldset>}
+
+          {groupEntries.length > 1 && <fieldset className="m-0 min-w-0 border-0 p-0 sm:col-span-2 md:col-span-1">
+            <legend className="control-label mb-1.5">{selectedGroup.family.includes('primary') ? 'Sample' : 'GBO line'}</legend>
+            <div className="flex flex-wrap gap-1.5">
+              {groupEntries.map((entry) => (
+                <button key={entry.id} className={toggleClass(entry.id === datasetId)} aria-pressed={entry.id === datasetId} onClick={() => { setDatasetId(entry.id); revealTissue(); }}>{entry.navigation.line}</button>
+              ))}
+            </div>
+          </fieldset>}
 
           {data.dataset.captures.length > 1 && (
             <Field label="Capture area" htmlFor="capture-area">
@@ -814,6 +876,7 @@ export default function Home() {
                 setSelectedCaptureId(event.target.value); setLineFilter('all'); setSelectedSpot(null);
                 if (cameraFrame.current !== null) cancelAnimationFrame(cameraFrame.current);
                 cameraFrame.current = null; pendingCamera.current = null;
+                wantHome.current = true;
                 setCamera({ x: 0, y: 0, scale: 1 });
               }}>
                 {data.dataset.captures.map((capture) => <option key={capture.id} value={capture.id}>{capture.label.replaceAll('UP-', '')}</option>)}
@@ -821,18 +884,18 @@ export default function Home() {
             </Field>
           )}
 
-          {!isHd && <fieldset className="col-span-2 m-0 min-w-0 space-y-1.5 border-0 p-0 md:col-span-1">
+          {!selectedEntry.navigation.line && !isHd && <fieldset className="m-0 min-w-0 space-y-1.5 border-0 p-0 sm:col-span-2 md:col-span-1">
             <legend className="control-label mb-1.5">{lineLabel}</legend>
             <div className="flex flex-wrap gap-1.5">
               {(captureLines.length <= 1 ? captureLines : ['all', ...captureLines]).map((line) => (
-                <button key={line} className={toggleClass(lineFilter === line || captureLines.length === 1)} aria-pressed={lineFilter === line || captureLines.length === 1} onClick={() => { setLineFilter(line); setSelectedSpot(null); }}>
+                <button key={line} className={toggleClass(lineFilter === line || captureLines.length === 1)} aria-pressed={lineFilter === line || captureLines.length === 1} onClick={() => { setLineFilter(line); setSelectedSpot(null); wantHome.current = true; revealTissue(); }}>
                   {line === 'all' ? 'All' : data.dataset.tissue_type === 'gGBO' ? formatGboLine(line) : line}
                 </button>
               ))}
             </div>
           </fieldset>}
 
-          <fieldset className="col-span-2 m-0 min-w-0 border-0 p-0 md:col-span-1">
+          <fieldset className="m-0 min-w-0 border-0 p-0 sm:col-span-2 md:col-span-1">
             <legend className="control-label float-left mb-1.5 w-full">Color {observationPlural} by</legend>
             <div className="clear-left grid grid-cols-2 gap-0.5 rounded-lg bg-ground p-0.5">
               {(['identity', 'gene'] as const).map((mode) => (
@@ -844,7 +907,7 @@ export default function Home() {
             </div>
           </fieldset>
 
-          <div className="col-span-2 min-w-0 space-y-2 md:col-span-1">
+          <div className="min-w-0 space-y-2 sm:col-span-2 md:col-span-1">
             <div className="flex items-baseline justify-between gap-2">
               <label className="control-label" htmlFor="gene-search">Gene</label>
               <span className="text-xs tabular-nums text-ink-3">{formatNumber(data.genes.length)} genes</span>
@@ -866,7 +929,7 @@ export default function Home() {
             <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 sm:grid sm:max-h-[9.5rem] sm:grid-cols-4 sm:gap-px sm:overflow-x-visible sm:overflow-y-auto sm:pb-0 md:grid-cols-2 pointer-coarse:md:max-h-[11rem] xl:max-h-[11rem]">
               {visibleGenes.map((gene) => (
                 <button key={gene.gene} aria-pressed={selectedGene === gene.gene} onClick={() => pickGene(gene.gene)}
-                  className={`gene h-7 shrink-0 truncate rounded-md px-2 text-left text-[13px] transition-colors pointer-coarse:h-10 sm:shrink ${selectedGene !== gene.gene ? 'text-ink hover:bg-ground' : displayMode === 'gene' ? 'bg-plum font-medium text-white' : 'bg-plum-soft font-medium text-plum'}`}>
+                  className={`gene h-7 shrink-0 truncate rounded-md px-2 text-left text-[13px] transition-colors pointer-coarse:h-10 sm:shrink ${selectedGene !== gene.gene ? 'text-ink hover:bg-ground' : displayMode === 'gene' ? 'bg-plum font-medium text-white' : 'font-medium text-plum underline decoration-plum/40 underline-offset-2 hover:bg-ground'}`}>
                   {gene.gene}
                 </button>
               ))}
@@ -881,7 +944,7 @@ export default function Home() {
           {displayMode === 'gene' && <div className="space-y-3 px-4 py-3.5">
             <fieldset className="m-0 min-w-0 border-0 p-0">
               <legend className="control-label float-left mb-1.5 w-full">Color scale</legend>
-              <div className="clear-left grid gap-1 sm:grid-cols-3 xl:grid-cols-1">
+              <div className="clear-left grid gap-1 sm:grid-cols-2 md:grid-cols-1">
                 {gradientOptions.map((gradient) => (
                   <button key={gradient.id} onClick={() => setGradientId(gradient.id)} aria-pressed={gradientId === gradient.id}
                     className={`flex h-7 items-center gap-2.5 rounded-md border px-2 text-left text-xs transition-colors pointer-coarse:h-10 ${gradientId === gradient.id ? 'border-plum bg-white text-ink ring-1 ring-plum' : 'border-transparent text-ink-2 hover:bg-ground hover:text-ink'}`}>
@@ -903,13 +966,13 @@ export default function Home() {
 
           {isHd && <div className="space-y-2 px-4 py-3.5">
             <label className="flex items-center justify-between" htmlFor="hd-dot-size"><span className="control-label">Cell dot size</span><span className="text-xs tabular-nums text-ink-2">{hdDotSize}%</span></label>
-            <input id="hd-dot-size" className="atlas-range" aria-label="Cell dot size" type="range" min="25" max="100" step="5" value={hdDotSize} onChange={(event) => setHdDotSize(Number(event.target.value))} />
+            <input id="hd-dot-size" className="atlas-range" aria-label="Cell dot size" aria-valuetext={`${hdDotSize}%`} type="range" min="25" max="100" step="5" value={hdDotSize} onChange={(event) => setHdDotSize(Number(event.target.value))} />
           </div>}
         </section>
 
         <section aria-label="Spatial view" className="flex min-h-[min(72svh,118vw)] flex-col p-2 [grid-area:view] sm:p-3 md:min-h-[70svh] xl:min-h-0">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 pb-2">
-            <p className="mr-auto text-xs text-ink-2">H&amp;E with {isHd ? 'segmented-cell centers' : 'capture spots'}. {verb} a {observationSingular} to inspect it.{zoomHint}</p>
+            <p className="mr-auto text-xs text-ink-2"><span className="hidden sm:inline">H&amp;E with {isHd ? 'segmented-cell centers' : 'capture spots'}; unmarked tissue isn’t in this dataset. </span>{verb} a {observationSingular} to inspect it. {zoomHint}</p>
             <div className="flex items-center gap-4">
               <OpacitySlider label="H&E" value={imageOpacity} onChange={setImageOpacity} />
               <OpacitySlider label={observationSingular === 'cell' ? 'Cells' : 'Spots'} value={spotOpacity} onChange={setSpotOpacity} />
@@ -930,13 +993,18 @@ export default function Home() {
             {...applicationRole}
             aria-label={`Tissue view, ${formatNumber(filteredSpots.length)} ${observationPlural}. Arrow keys move between ${observationPlural}, plus and minus zoom, 0 resets, Escape clears the selection.`}
             onKeyDown={handlePlateKey}
-            className={`relative flex min-h-0 flex-1 touch-pan-y select-none items-center justify-center overflow-hidden rounded-lg border border-rule-strong bg-[#e5e1da] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            className={`relative flex min-h-0 flex-1 select-none ${home && camera.scale > home.scale * 1.01 ? 'touch-none' : 'touch-pan-y'} items-center justify-center overflow-hidden rounded-lg border border-rule-strong bg-[#e5e1da] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
             ref={spatialPanelRef}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
           >
+            {data.dataset.id !== datasetId && <div className="absolute inset-0 z-20 grid place-items-center bg-ground/60">
+              {datasetError ? <div role="alert" className="flex items-center gap-3 rounded-md border border-rule bg-panel px-3 py-2 text-sm">
+                <span>Unable to load {viewLabel}.</span><Button size="sm" onClick={() => setRetry((value) => value + 1)}>Retry</Button>
+              </div> : <output className="flex items-center gap-2 rounded-md border border-rule bg-panel px-3 py-2 text-sm text-ink-2"><ZoneMark className="size-4 animate-pulse" />Loading {viewLabel}…</output>}
+            </div>}
             {imageStatus !== 'loaded' && <output className="absolute left-3 top-3 z-10 rounded-md border border-rule bg-panel px-2.5 py-1.5 text-xs text-ink-2">
               {imageStatus === 'error' ? <><span>Histology unavailable or image dimensions do not match.</span> <button className="underline underline-offset-2" onPointerDown={(event) => event.stopPropagation()} onClick={() => setImageRetry((value) => value + 1)}>Retry image</button></> : 'Loading full-resolution histology…'}
             </output>}
@@ -990,7 +1058,7 @@ export default function Home() {
               <button aria-label="Clear selection" onPointerDown={(event) => event.stopPropagation()} onClick={() => setSelectedSpot(null)}
                 className="grid size-7 shrink-0 place-items-center rounded text-ink-3 hover:bg-ground hover:text-ink pointer-coarse:size-10"><X className="size-4" /></button>
             </div>}
-            <p className={`pointer-events-none absolute right-3 top-3 rounded-md bg-panel/90 px-2 py-1 text-xs text-ink-2 ${selectedSpot ? 'hidden xl:block' : 'hidden sm:block'}`}>{formatNumber(filteredSpots.length)} {observationPlural}{screen.wide ? ' · drag to pan, scroll to zoom' : ''}</p>
+            <p className={`pointer-events-none absolute right-3 top-3 rounded-md bg-panel/90 px-2 py-1 text-xs text-ink-2 ${selectedSpot ? 'hidden xl:block' : 'hidden sm:block'}`}>{formatNumber(filteredSpots.length)} {observationPlural}</p>
           </div>
         </section>
 
@@ -1057,6 +1125,19 @@ export default function Home() {
   );
 }
 
+// Pointer position in pixels from the panel center, the camera's frame.
+function panelOffset(element: HTMLElement, clientX: number, clientY: number) {
+  const bounds = element.getBoundingClientRect();
+  return { x: clientX - bounds.left - bounds.width / 2, y: clientY - bounds.top - bounds.height / 2 };
+}
+
+// Zoom by a factor while keeping the image point under the cursor in place.
+function zoomCameraAt(current: { x: number; y: number; scale: number }, cursor: { x: number; y: number }, factor: number, maxZoom: number) {
+  const scale = Math.min(maxZoom, Math.max(minZoom, current.scale * factor));
+  const ratio = scale / current.scale;
+  return { x: cursor.x - (cursor.x - current.x) * ratio, y: cursor.y - (cursor.y - current.y) * ratio, scale };
+}
+
 // The tissue view handles its own arrow keys, like a map, so it takes the application role.
 const applicationRole = { role: 'application', tabIndex: 0 } as const;
 
@@ -1094,7 +1175,7 @@ function OpacitySlider({ label, value, onChange }: { label: string; value: numbe
   return (
     <label className="grid grid-cols-[auto_72px_30px] items-center gap-2 text-xs font-medium text-ink-2">
       <span>{label}</span>
-      <input className="atlas-range" type="range" min="10" max="100" value={value} aria-label={`${label} opacity`} onChange={(event) => onChange(Number(event.target.value))} />
+      <input className="atlas-range" type="range" min="10" max="100" value={value} aria-label={`${label} opacity`} aria-valuetext={`${value}%`} onChange={(event) => onChange(Number(event.target.value))} />
       <span className="text-right tabular-nums">{value}%</span>
     </label>
   );

@@ -56,3 +56,22 @@ test('camera centers convert between panel pixels and image units', () => {
   assert.deepEqual(parseZoom('2,10,20'), { scale: 2, cx: 10, cy: 20 });
   assert.equal(parseZoom('nope'), null);
 });
+
+test('fitCamera frames the shown points and never zooms out past the image', async () => {
+  const { fitCamera, cameraCenter } = await import('../lib/atlas-display.mjs');
+  const image = { width: 4000, height: 4000 };
+  const panel = { width: 800, height: 800 };
+  const camera = fitCamera([{ x: 1000, y: 1000 }, { x: 1400, y: 1400 }], image, panel, 20, 0);
+  assert.equal(camera.scale, 10);
+  const center = cameraCenter(camera, image, panel);
+  assert.ok(Math.abs(center.cx - 1200) < 1e-6 && Math.abs(center.cy - 1200) < 1e-6);
+  assert.equal(fitCamera([{ x: 0, y: 0 }, { x: 4000, y: 4000 }], image, panel, 20).scale, 1);
+  assert.deepEqual(fitCamera([], image, panel, 20), { x: 0, y: 0, scale: 1 });
+});
+
+test('datasetFamily separates data type from condition', async () => {
+  const { datasetFamily } = await import('../lib/atlas-display.mjs');
+  assert.deepEqual(datasetFamily('Visium · early-passage · CAR-T'), { family: 'Visium · early-passage', condition: 'CAR-T' });
+  assert.deepEqual(datasetFamily('Visium HD · hypoxia'), { family: 'Visium HD · gGBO', condition: 'hypoxia' });
+  assert.deepEqual(datasetFamily('Visium HD · primary GBM'), { family: 'Visium HD · primary GBM', condition: '' });
+});
