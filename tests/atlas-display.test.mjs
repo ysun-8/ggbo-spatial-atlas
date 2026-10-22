@@ -75,3 +75,13 @@ test('datasetFamily separates data type from condition', async () => {
   assert.deepEqual(datasetFamily('Visium HD · hypoxia'), { family: 'Visium HD · gGBO', condition: 'hypoxia' });
   assert.deepEqual(datasetFamily('Visium HD · primary GBM'), { family: 'Visium HD · primary GBM', condition: '' });
 });
+
+test('a manual maximum carries within a data type and clears across types', async () => {
+  const { carryManualMax } = await import('../lib/atlas-display.mjs');
+  const previous = { max: '0.5', family: 'Visium HD · gGBO' };
+  assert.deepEqual(carryManualMax(previous, 'Visium HD · gGBO'), { max: '0.5', cleared: '' });
+  assert.deepEqual(carryManualMax(previous, 'Visium HD · primary GBM'), { max: '', cleared: '0.5' });
+  assert.deepEqual(carryManualMax({ max: '', family: 'Visium HD · gGBO' }, 'Visium · early-passage'), { max: '', cleared: '' });
+  assert.deepEqual(carryManualMax({ max: '-1', family: 'Visium HD · gGBO' }, 'Visium · early-passage'), { max: '', cleared: '' });
+  assert.deepEqual(carryManualMax(null, 'Visium HD · gGBO'), { max: '', cleared: '' });
+});

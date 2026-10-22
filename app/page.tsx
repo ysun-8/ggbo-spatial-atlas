@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Link2, Minus, Plus, RotateCcw, Search, X } from 'lucide-react';
 
-import { detectedCeiling, readView, writeView, assetPath, pinchCamera, parseZoom, cameraCenter, cameraForCenter, fitCamera, sameCamera, datasetFamily } from '@/lib/atlas-display.mjs';
+import { detectedCeiling, readView, writeView, assetPath, pinchCamera, parseZoom, cameraCenter, cameraForCenter, fitCamera, sameCamera, datasetFamily, carryManualMax } from '@/lib/atlas-display.mjs';
 import { nearestPoint, nextPointInDirection } from '@/lib/atlas-canvas.mjs';
 import { searchGenes } from '@/lib/atlas-genes.mjs';
 import { AtlasPointCanvas, SelectedMarker } from '@/components/atlas-point-canvas';
@@ -215,6 +215,8 @@ export default function Home() {
   const activeCapture = data?.dataset.captures.find((capture) => capture.id === selectedCaptureId) ?? data?.dataset.captures[0];
   const [selectedGene, setSelectedGene] = useState('CA9');
   const [manualMax, setManualMax] = useState('');
+  const [maxNotice, setMaxNotice] = useState('');
+  const dataFamily = datasetFamily(selectedEntry.navigation.label).family;
   const [urlReady, setUrlReady] = useState(false);
   const [gradientId, setGradientId] = useState<GradientId>('viridis');
   const [imageOpacity, setImageOpacity] = useState(50);
@@ -243,11 +245,13 @@ export default function Home() {
 
   const [geneLoading, setGeneLoading] = useState(false);
   const [geneNotice, setGeneNotice] = useState('');
-  // The gene, mode, and maximum carry over when switching datasets so readers can compare samples.
-  const currentView = useRef<{ gene: string; mode: 'gene' | 'identity'; max: string } | null>(null);
+  // The gene and mode carry over when switching datasets so readers can compare samples.
+  // The maximum carries only within the data type of the dataset it was set on.
+  const currentView = useRef<{ gene: string; mode: 'gene' | 'identity'; max: string; family: string } | null>(null);
+  const loadedFamily = data ? datasetFamily(datasetOptions.find((entry) => entry.id === data.dataset.id)?.navigation.label ?? '').family : '';
   useEffect(() => {
-    if (urlReady) currentView.current = { gene: selectedGene, mode: displayMode, max: manualMax };
-  }, [urlReady, selectedGene, displayMode, manualMax]);
+    if (urlReady) currentView.current = { gene: selectedGene, mode: displayMode, max: manualMax, family: loadedFamily };
+  }, [urlReady, selectedGene, displayMode, manualMax, loadedFamily]);
   const [lineFilter, setLineFilter] = useState('all');
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const needsExpression = displayMode === 'gene' || selectedSpot !== null;
@@ -350,7 +354,10 @@ export default function Home() {
         setSelectedGene(geneFound ? gene : fallbackGene);
         setGeneNotice(geneFound ? '' : `${gene} isn’t in this dataset. Showing ${fallbackGene}.`);
         setDisplayMode(carried?.mode === 'gene' ? 'gene' : 'identity');
-        setManualMax(carried?.max ?? '');
+        const previous = currentView.current;
+        const max = !geneFound ? { max: '', cleared: '' } : view ? { max: view.max, cleared: '' } : carryManualMax(previous, datasetFamily(selectedDataset.navigation.label).family);
+        setManualMax(max.max);
+        setMaxNotice(max.cleared ? `Manual maximum ${max.cleared} cleared: it was set on ${previous?.family}. Automatic scaling is on.` : '');
         setGeneResult(null);
         setGeneError(false);
         // No expression request is needed in this state.
@@ -441,7 +448,9 @@ export default function Home() {
     const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     document.getElementById('tissue')?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
   };
+  // A manual maximum belongs to one gene, so choosing another gene returns to automatic scaling.
   const pickGene = (gene: string, notice = '') => {
+    if (gene !== selectedGene) { setManualMax(''); setMaxNotice(''); }
     setSelectedGene(gene);
     setDisplayMode('gene');
     setGeneNotice(notice);
@@ -697,7 +706,7 @@ export default function Home() {
   const panelSize = { width: panelWidth, height: panelHeight };
   const center = cameraCenter(camera, imageSize, panelSize);
   const viewQuery = writeView({ dataset: datasetId, capture: selectedCaptureId, line: lineFilter, gene: selectedGene, mode: displayMode,
-    max: hasManualMax ? String(parsedMax) : '', cmap: gradientId === 'viridis' ? '' : gradientId,
+    max: displayMode === 'gene' && hasManualMax ? String(parsedMax) : '', cmap: gradientId === 'viridis' ? '' : gradientId,
     he: imageOpacity === 50 ? '' : String(imageOpacity), dots: spotOpacity === 80 ? '' : String(spotOpacity),
     dot: data?.dataset.kind === 'hd' && hdDotSize !== 65 ? String(hdDotSize) : '',
     zoom: isDefaultCamera ? '' : `${camera.scale.toFixed(2)},${Math.round(center.cx)},${Math.round(center.cy)}`,
@@ -962,11 +971,13 @@ export default function Home() {
             </fieldset>
             <div className="space-y-1.5">
               <label className="control-label" htmlFor="expression-max">Expression maximum</label>
-              <input id="expression-max" type="number" min="0.000001" step="any" inputMode="decimal" placeholder={`Automatic (${automaticCeiling ? automaticCeiling.toFixed(2) : 'P95'})`} value={manualMax} onChange={(event) => setManualMax(event.target.value)}
+              <input id="expression-max" type="number" min="0.000001" step="any" inputMode="decimal" placeholder={`Automatic (${automaticCeiling ? automaticCeiling.toFixed(2) : 'P95'})`} value={manualMax} onChange={(event) => { setManualMax(event.target.value); setMaxNotice(''); }}
                 className="h-8 w-full rounded-md border border-rule-strong bg-white px-2.5 text-sm tabular-nums outline-none placeholder:text-ink-3 focus:border-plum focus:ring-2 focus:ring-plum/30" />
               {manualMax && !hasManualMax
                 ? <p className="text-xs text-plum" role="alert">Enter a positive number. Automatic scaling is on.</p>
-                : <p className="text-xs leading-4 text-ink-3">Leave blank for automatic scaling. Enter the same maximum to compare samples. Values are {data.dataset.expression.assay}/{data.dataset.expression.layer}.</p>}
+                : maxNotice
+                  ? <output className="block text-xs leading-4 text-plum">{maxNotice}</output>
+                  : <p className="text-xs leading-4 text-ink-3">Leave blank for automatic scaling. A manual maximum applies to <span className="gene">{selectedGene}</span> and stays set across samples in {dataFamily}, so they share one scale. Values are {data.dataset.expression.assay}/{data.dataset.expression.layer}.</p>}
             </div>
           </div>}
 
@@ -978,7 +989,7 @@ export default function Home() {
 
         <section aria-label="Spatial view" className="flex min-h-[min(72svh,118vw)] flex-col p-2 [grid-area:view] sm:p-3 md:min-h-[70svh] xl:min-h-0">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 pb-2">
-            <p className="mr-auto text-xs text-ink-2"><span className="hidden sm:inline">H&amp;E with {isHd ? 'segmented-cell centers' : 'capture spots'}; unmarked tissue isn’t in this dataset. </span>{verb} a {observationSingular} to inspect it. {zoomHint}</p>
+            <p className="mr-auto text-xs text-ink-2"><span className="hidden sm:inline">H&amp;E with {isHd ? 'segmented-cell centers' : 'capture spots'}. </span>{verb} a {observationSingular} to inspect it. {zoomHint}</p>
             <div className="flex items-center gap-4">
               <OpacitySlider label="H&E" value={imageOpacity} onChange={setImageOpacity} />
               <OpacitySlider label={observationSingular === 'cell' ? 'Cells' : 'Spots'} value={spotOpacity} onChange={setSpotOpacity} />
@@ -1028,7 +1039,8 @@ export default function Home() {
               <summary onPointerDown={(event) => event.stopPropagation()}
                 className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-[13px] pointer-coarse:min-h-10 [&::-webkit-details-marker]:hidden">
                 {displayMode === 'gene' ? (
-                  <><span className="gene font-medium">{selectedGene}</span><span className="h-2 w-12 rounded-[2px]" style={{ background: gradientCss }} aria-hidden="true" /></>
+                  <><span className="gene font-medium">{selectedGene}</span><span className="h-2 w-12 rounded-[2px]" style={{ background: gradientCss }} aria-hidden="true" />
+                    {hasManualMax && <span className="font-mono text-xs tabular-nums text-plum">max {parsedMax}</span>}</>
                 ) : (
                   <><span className="font-medium">Legend</span><span className="flex gap-1" aria-hidden="true">{legendIdentities.slice(0, 6).map((identity) => <i key={identity} className="size-2 rounded-full" style={{ background: getIdentityColor(identity) }} />)}</span></>
                 )}
@@ -1043,6 +1055,8 @@ export default function Home() {
                     <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-2"><i className="size-2.5 shrink-0 rounded-full border border-rule" style={{ background: notDetectedColor }} aria-hidden="true" />Not detected</p>
                     {selectedStats && <p className="mt-1.5 max-w-52 text-xs leading-4 text-ink-2">Detected in {formatNumber(selectedStats.detected)} of {formatNumber(data.spots.length)} {observationPlural} ({(detectedShare * 100).toFixed(detectedShare < 0.1 ? 1 : 0)}%).</p>}
                     <p className="mt-1 max-w-52 text-xs leading-4 text-ink-3">{hasManualMax ? 'Manual maximum.' : `95th percentile of expressing ${observationPlural}.`} Higher values use the top color and are drawn on top.</p>
+                    {hasManualMax && <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => { setManualMax(''); setMaxNotice(''); }}
+                      className="mt-1.5 rounded-md border border-rule-strong bg-white px-2 py-1 text-xs text-ink hover:border-plum focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plum/30 pointer-coarse:min-h-10">Reset to automatic (P95)</button>}
                   </>
                 ) : (
                   <ul className="grid gap-1.5" aria-label="Identity legend">
