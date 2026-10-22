@@ -164,6 +164,10 @@ const gradientOptions = [
 
 type GradientId = (typeof gradientOptions)[number]['id'];
 
+// Cells or spots with no detected expression share one translucent neutral under every scale,
+// so sparse genes don't paint the tissue in the scale's low color and the H&E shows through.
+const notDetectedColor = 'rgba(211,211,211,0.55)';
+
 function hexToRgb(hex: string) {
   const value = hex.replace('#', '');
   return [0, 2, 4].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16));
@@ -482,7 +486,9 @@ export default function Home() {
   const spotColors = useMemo(() => new Map(filteredSpots.map((spot) => {
     if (displayMode === 'identity') return [spot.id, getIdentityColor(spot.identity)] as const;
     if (!geneColorsReady) return [spot.id, '#b5b5b5'] as const;
-    return [spot.id, interpolateColor(expressionOf(spot) / (activeCeiling || 1), gradientId)] as const;
+    const value = expressionOf(spot);
+    if (value <= 0) return [spot.id, notDetectedColor] as const;
+    return [spot.id, interpolateColor(value / (activeCeiling || 1), gradientId)] as const;
   })), [filteredSpots, displayMode, getIdentityColor, geneColorsReady, expressionOf, activeCeiling, gradientId]);
 
   // In gene mode, draw low expression first so the highest-expressing cells sit on top.
@@ -1034,6 +1040,7 @@ export default function Home() {
                     <p className="text-xs text-ink-3">{geneError ? 'Unavailable' : geneLoading || (isHd && !geneValues) ? 'Loading…' : `${data.dataset.expression.assay}/${data.dataset.expression.layer}`}</p>
                     <div className="mt-1.5 h-2 w-52 max-w-full rounded-[2px]" style={{ background: gradientCss }} />
                     <div className="mt-1 flex justify-between font-mono text-xs tabular-nums text-ink-2"><span>0</span><span>{geneLoading || (isHd && !geneValues) ? '–' : `${colorCeiling.toFixed(2)}${hasManualMax ? '' : ' (P95)'}`}</span></div>
+                    <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-2"><i className="size-2.5 shrink-0 rounded-full border border-rule" style={{ background: notDetectedColor }} aria-hidden="true" />Not detected</p>
                     {selectedStats && <p className="mt-1.5 max-w-52 text-xs leading-4 text-ink-2">Detected in {formatNumber(selectedStats.detected)} of {formatNumber(data.spots.length)} {observationPlural} ({(detectedShare * 100).toFixed(detectedShare < 0.1 ? 1 : 0)}%).</p>}
                     <p className="mt-1 max-w-52 text-xs leading-4 text-ink-3">{hasManualMax ? 'Manual maximum.' : `95th percentile of expressing ${observationPlural}.`} Higher values use the top color and are drawn on top.</p>
                   </>
