@@ -146,8 +146,10 @@ body {
 }
 
 @media (pointer: coarse) {
+  /* A 44px touch area with the 6px track drawn through its middle. */
   .atlas-range {
-    height: 6px;
+    height: 44px;
+    background: linear-gradient(var(--atlas-rule-strong), var(--atlas-rule-strong)) center / 100% 6px no-repeat;
   }
 
   .atlas-range::-webkit-slider-thumb {

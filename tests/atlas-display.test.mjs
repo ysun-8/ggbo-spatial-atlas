@@ -11,8 +11,10 @@ test('sparse genes scale on detected values without a maximum fallback', () => {
 });
 const datasets = [{id:'baseline'}, {id:'hd-12163'}];
 test('shareable view round trips special characters and manual scale', () => {
-  const view = {dataset:'baseline',capture:'capture-a',region:'slice 1',line:'UP-11789',gene:'HLA-DRA',mode:'gene',max:'2.5',cmap:'',zoom:'',cell:'',he:'',dots:'',dot:''};
+  const view = {dataset:'baseline',capture:'capture-a',region:'slice 1',line:'UP-11789',gene:'HLA-DRA',mode:'gene',max:'2.5',cmap:'',zoom:'',cell:'',he:'',dots:'',dot:'',show:''};
   assert.deepEqual(readView(writeView(view), datasets, 'baseline'), view);
+  const highlighted = {...view, mode:'identity', max:'', show:'OPZ,hemorrhage/debris'};
+  assert.deepEqual(readView(writeView(highlighted), datasets, 'baseline'), highlighted);
 });
 test('invalid URLs fall back safely and CAR-T alias preserves older IDs', () => {
   const view = readView('?dataset=missing&max=-5&mode=unknown',datasets,'baseline');
@@ -42,7 +44,7 @@ test('pinch zoom keeps the image point under the fingers', () => {
 
 test('full views round trip camera, colormap, opacity, and selected cell', () => {
   const view = { dataset: 'baseline', capture: 'a', region: 'all', line: 'all', gene: 'CA9', mode: 'gene', max: '',
-    cmap: 'magenta', zoom: '3.5,1200.5,800', cell: 'cellid_000023980-1', he: '70', dots: '90', dot: '55' };
+    cmap: 'magenta', zoom: '3.5,1200.5,800', cell: 'cellid_000023980-1', show: '', he: '70', dots: '90', dot: '55' };
   assert.deepEqual(readView(writeView(view), datasets, 'baseline'), view);
   const bad = readView('?cmap=Bad1&zoom=0,1,2&he=5&dots=abc&dot=200', datasets, 'baseline');
   assert.deepEqual([bad.cmap, bad.zoom, bad.he, bad.dots, bad.dot], ['', '', '', '', '']);

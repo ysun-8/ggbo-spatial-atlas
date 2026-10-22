@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Link2, Minus, Plus, RotateCcw, Search, X } from 'lucide-react';
+import { ChevronDown, Link2, Minus, Plus, RotateCcw, Search, Share, X } from 'lucide-react';
 
 import { detectedCeiling, readView, writeView, assetPath, pinchCamera, parseZoom, cameraCenter, cameraForCenter, fitCamera, sameCamera, datasetFamily, carryManualMax } from '@/lib/atlas-display.mjs';
 import { nearestPoint, nextPointInDirection } from '@/lib/atlas-canvas.mjs';
@@ -166,7 +166,8 @@ type GradientId = (typeof gradientOptions)[number]['id'];
 
 // Cells or spots with no detected expression share one translucent neutral under every scale,
 // so sparse genes don't paint the tissue in the scale's low color and the H&E shows through.
-const notDetectedColor = 'rgba(211,211,211,0.55)';
+// Identities left out of a legend highlight use the same neutral.
+const neutralColor = 'rgba(211,211,211,0.55)';
 
 function hexToRgb(hex: string) {
   const value = hex.replace('#', '');
@@ -216,7 +217,11 @@ export default function Home() {
   const [selectedGene, setSelectedGene] = useState('CA9');
   const [manualMax, setManualMax] = useState('');
   const [maxNotice, setMaxNotice] = useState('');
-  const dataFamily = datasetFamily(selectedEntry.navigation.label).family;
+  // Identities picked in the legend are highlighted; the rest fade to neutral.
+  const [shownIdentities, setShownIdentities] = useState<string[]>([]);
+  const shownSet = useMemo(() => new Set(shownIdentities), [shownIdentities]);
+  const toggleIdentity = (identity: string) => setShownIdentities((current) =>
+    current.includes(identity) ? current.filter((item) => item !== identity) : [...current, identity]);
   const [urlReady, setUrlReady] = useState(false);
   const [gradientId, setGradientId] = useState<GradientId>('viridis');
   const [imageOpacity, setImageOpacity] = useState(50);
@@ -277,11 +282,12 @@ export default function Home() {
   const pendingCamera = useRef<typeof camera | null>(null);
   // A shared link's zoom waits until the panel has a size to frame it in.
   const pendingZoom = useRef<ReturnType<typeof parseZoom>>(null);
-  const [screen, setScreen] = useState({ wide: true, coarse: false });
+  const [screen, setScreen] = useState({ wide: true, coarse: false, share: false });
   useEffect(() => {
     const wide = window.matchMedia('(min-width: 1280px)');
     const coarse = window.matchMedia('(pointer: coarse)');
-    const update = () => setScreen({ wide: wide.matches, coarse: coarse.matches });
+    // Touch devices with a share sheet share the link there instead of copying it.
+    const update = () => setScreen({ wide: wide.matches, coarse: coarse.matches, share: coarse.matches && typeof navigator.share === 'function' });
     update();
     wide.addEventListener('change', update);
     coarse.addEventListener('change', update);
@@ -358,6 +364,9 @@ export default function Home() {
         const max = !geneFound ? { max: '', cleared: '' } : view ? { max: view.max, cleared: '' } : carryManualMax(previous, datasetFamily(selectedDataset.navigation.label).family);
         setManualMax(max.max);
         setMaxNotice(max.cleared ? `Manual maximum ${max.cleared} cleared: it was set on ${previous?.family}. Automatic scaling is on.` : '');
+        // The notice sits in the legend, so a collapsed legend opens to show it.
+        if (max.cleared) setLegendOpen(true);
+        setShownIdentities(view?.show ? view.show.split(',').filter((identity) => payload.dataset.identities.includes(identity)) : []);
         setGeneResult(null);
         setGeneError(false);
         // No expression request is needed in this state.
@@ -493,20 +502,22 @@ export default function Home() {
   const geneColorsReady = displayMode === 'gene' && !(data?.dataset.gene_data_path && !colorValues);
 
   const spotColors = useMemo(() => new Map(filteredSpots.map((spot) => {
-    if (displayMode === 'identity') return [spot.id, getIdentityColor(spot.identity)] as const;
+    if (displayMode === 'identity') return [spot.id, shownSet.size && !shownSet.has(spot.identity) ? neutralColor : getIdentityColor(spot.identity)] as const;
     if (!geneColorsReady) return [spot.id, '#b5b5b5'] as const;
     const value = expressionOf(spot);
-    if (value <= 0) return [spot.id, notDetectedColor] as const;
+    if (value <= 0) return [spot.id, neutralColor] as const;
     return [spot.id, interpolateColor(value / (activeCeiling || 1), gradientId)] as const;
-  })), [filteredSpots, displayMode, getIdentityColor, geneColorsReady, expressionOf, activeCeiling, gradientId]);
+  })), [filteredSpots, displayMode, getIdentityColor, shownSet, geneColorsReady, expressionOf, activeCeiling, gradientId]);
 
-  // In gene mode, draw low expression first so the highest-expressing cells sit on top.
+  // In gene mode, draw low expression first so the highest-expressing cells sit on top;
+  // with a legend highlight, the highlighted identities sit on top.
   const drawnSpots = useMemo(() => {
+    if (displayMode === 'identity' && shownSet.size) return [...filteredSpots].sort((a, b) => Number(shownSet.has(a.identity)) - Number(shownSet.has(b.identity)));
     if (!geneColorsReady) return filteredSpots;
     return filteredSpots.map((spot) => ({ spot, value: expressionOf(spot) }))
       .sort((a, b) => a.value - b.value)
       .map(({ spot }) => spot);
-  }, [filteredSpots, geneColorsReady, expressionOf]);
+  }, [filteredSpots, displayMode, shownSet, geneColorsReady, expressionOf]);
 
   const getSelectedExpression = (spot: Spot) => {
     if (data?.dataset.gene_data_path && spot.index !== undefined) return geneValues?.[spot.index] ?? null;
@@ -658,17 +669,26 @@ export default function Home() {
   const [imageRetry, setImageRetry] = useState(0);
   const imageKey = `${tissueImage}:${imageWidth}:${imageHeight}:${imageRetry}`;
   const imageStatus = imageState?.key === imageKey ? imageState.status : 'loading';
+  // The 2048-pixel preview is sharp on a phone until the reader zooms in, so touch screens
+  // fetch the 12–14 MB full-resolution H&E only then. Once fetched it stays.
+  const [fullResImages, setFullResImages] = useState<string[]>([]);
+  const wantsFullRes = !screen.coarse || !previewImage || camera.scale > (home?.scale ?? 1) * 1.5;
   useEffect(() => {
-    if (!tissueImage) return;
+    // oxlint-disable-next-line react/react-compiler
+    if (wantsFullRes && tissueImage && !fullResImages.includes(tissueImage)) setFullResImages((list) => [...list, tissueImage]);
+  }, [wantsFullRes, tissueImage, fullResImages]);
+  const fullResImage = wantsFullRes || fullResImages.includes(tissueImage) ? tissueImage : '';
+  useEffect(() => {
+    if (!fullResImage) return;
     let active = true;
     const image = new Image();
     image.onload = () => {
       if (active) setImageState({ key: imageKey, status: image.naturalWidth === imageWidth && image.naturalHeight === imageHeight ? 'loaded' : 'error' });
     };
     image.onerror = () => { if (active) setImageState({ key: imageKey, status: 'error' }); };
-    image.src = tissueImage;
+    image.src = fullResImage;
     return () => { active = false; image.onload = null; image.onerror = null; };
-  }, [tissueImage, imageWidth, imageHeight, imageKey]);
+  }, [fullResImage, imageWidth, imageHeight, imageKey]);
   // The view box matches the panel's shape, so zoomed-in views fill the whole panel.
   const panelWidth = viewportSize.width || imageWidth;
   const panelHeight = viewportSize.height || imageHeight;
@@ -710,7 +730,7 @@ export default function Home() {
     he: imageOpacity === 50 ? '' : String(imageOpacity), dots: spotOpacity === 80 ? '' : String(spotOpacity),
     dot: data?.dataset.kind === 'hd' && hdDotSize !== 65 ? String(hdDotSize) : '',
     zoom: isDefaultCamera ? '' : `${camera.scale.toFixed(2)},${Math.round(center.cx)},${Math.round(center.cy)}`,
-    cell: selectedSpot?.id ?? '' });
+    cell: selectedSpot?.id ?? '', show: displayMode === 'identity' ? shownIdentities.join(',') : '' });
   useEffect(() => {
     if (!urlReady || !data || data.dataset.id !== datasetId) return;
     // Debounced so panning doesn't flood the browser's history API.
@@ -766,7 +786,7 @@ export default function Home() {
       <g>
         <g opacity={imageOpacity / 100} className="pointer-events-none">
           {previewImage && <image key={previewImage} href={previewImage} width={imageWidth} height={imageHeight} />}
-          <image key={tissueImage} href={tissueImage} width={imageWidth} height={imageHeight} />
+          {fullResImage && <image key={fullResImage} href={fullResImage} width={imageWidth} height={imageHeight} />}
         </g>
         <g>
           {drawnSpots.map((spot) => {
@@ -778,7 +798,7 @@ export default function Home() {
         </g>
       </g>
     );
-  }, [useCanvas, imageWidth, imageHeight, tissueImage, previewImage, imageOpacity, drawnSpots, selectedSpot, selectedPointRadius, pointRadius, spotColors, spotOpacity, isHd]);
+  }, [useCanvas, imageWidth, imageHeight, fullResImage, previewImage, imageOpacity, drawnSpots, selectedSpot, selectedPointRadius, pointRadius, spotColors, spotOpacity, isHd]);
 
   const umapPanel = useMemo(() => useCanvas ? (
     <AtlasPointCanvas points={umapPoints} colors={spotColors} viewBox="0 0 240 180" radius={1} opacity={0.76} interactive={false}
@@ -800,19 +820,31 @@ export default function Home() {
 
   const viewLabel = `${selectedEntry.navigation.label}${selectedEntry.navigation.line ? ` · ${selectedEntry.navigation.line}` : ''}`;
 
+  // Until the cells arrive, the small H&E preview stands in so a shared link shows tissue at once.
   if (!data) {
+    const loadingPreview = selectedEntry.captures[0]?.preview;
     return (
-      <main className="grid min-h-screen place-items-center bg-ground px-6 text-ink">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <ZoneMark className={`size-10 ${datasetError ? '' : 'animate-pulse'}`} />
-          {datasetError ? (
-            <div role="alert" className="space-y-3">
-              <p className="text-sm font-medium">Unable to load {viewLabel}.</p>
-              <Button onClick={() => setRetry((value) => value + 1)}>Retry</Button>
+      <main className="flex min-h-screen flex-col bg-ground text-ink">
+        <header className="flex items-center gap-3 border-b border-rule bg-panel px-4 py-2.5 lg:px-5">
+          <ZoneMark className="size-8 shrink-0" />
+          <h1 className="text-[17px] font-semibold leading-6 tracking-[-0.01em]">{catalog.site.title}</h1>
+        </header>
+        <div className="grid flex-1 place-items-center p-2 sm:p-3">
+          <div className="relative grid w-full max-w-3xl place-items-center overflow-hidden rounded-lg border border-rule-strong bg-[#e5e1da]">
+            {loadingPreview && <svg viewBox={`0 0 ${selectedEntry.captures[0].width} ${selectedEntry.captures[0].height}`} className="w-full opacity-50" aria-hidden="true">
+              <image href={publicPath(loadingPreview, selectedEntry.asset_base_url)} width={selectedEntry.captures[0].width} height={selectedEntry.captures[0].height} />
+            </svg>}
+            <div className={`${loadingPreview ? 'absolute' : 'py-24'} flex flex-col items-center gap-3 rounded-md border border-rule bg-panel/95 px-4 py-3 text-center`}>
+              {datasetError ? (
+                <div role="alert" className="space-y-3">
+                  <p className="text-sm font-medium">Unable to load {viewLabel}.</p>
+                  <Button onClick={() => setRetry((value) => value + 1)}>Retry</Button>
+                </div>
+              ) : (
+                <p className="flex items-center gap-2 text-sm text-ink-2" aria-live="polite"><ZoneMark className="size-4 animate-pulse" />Loading {viewLabel}…</p>
+              )}
             </div>
-          ) : (
-            <p className="text-sm text-ink-2" aria-live="polite">Loading {viewLabel}…</p>
-          )}
+          </div>
         </div>
       </main>
     );
@@ -823,6 +855,11 @@ export default function Home() {
     .map((identity, index) => ({ identity, index }))
     .sort((a, b) => zoneRank(a.identity) - zoneRank(b.identity) || a.index - b.index)
     .map(({ identity }) => identity);
+  // Primary GBM tumor states are listed ahead of the non-tumor cell types.
+  const tumorStates = tumorStateOrder.filter((identity) => legendIdentities.includes(identity));
+  const legendGroups = tumorStates.length
+    ? [{ label: 'Tumor states', identities: tumorStates }, { label: 'Other cells', identities: legendIdentities.filter((identity) => !tumorStates.includes(identity)) }]
+    : [{ label: '', identities: legendIdentities }];
   const selectedValue = selectedSpot ? (geneLoading ? null : getSelectedExpression(selectedSpot)) : null;
   const selectedValueText = selectedValue !== null ? selectedValue.toFixed(2) : geneError ? 'unavailable' : '…';
   const selectedStats = data.genes.find((gene) => gene.gene === selectedGene);
@@ -844,23 +881,32 @@ export default function Home() {
           </div>
         </div>
         <div className="ml-auto flex items-center gap-4 text-xs">
-          <a className="text-ink underline decoration-rule-strong underline-offset-[3px] hover:decoration-plum" href={publicPath('/about.html')}><span className="sm:hidden">Methods</span><span className="hidden sm:inline">Methods &amp; source</span></a>
-          <button aria-label="Copy link to this view" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rule-strong bg-white px-2.5 font-medium text-ink transition-colors hover:border-ink-3 pointer-coarse:h-10" onClick={async () => {
-            try { await navigator.clipboard.writeText(window.location.origin + window.location.pathname + viewQuery + window.location.hash); setShareStatus('Link copied'); }
+          <a className="text-ink underline decoration-rule-strong underline-offset-[3px] hover:decoration-plum pointer-coarse:inline-flex pointer-coarse:h-11 pointer-coarse:items-center" href={publicPath('/about.html')}><span className="sm:hidden">Methods</span><span className="hidden sm:inline">Methods &amp; source</span></a>
+          <button aria-label={screen.share ? 'Share a link to this view' : 'Copy link to this view'} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rule-strong bg-white px-2.5 font-medium text-ink transition-colors hover:border-ink-3 pointer-coarse:h-11" onClick={async () => {
+            const url = window.location.origin + window.location.pathname + viewQuery + window.location.hash;
+            if (screen.share) {
+              // Closing the share sheet rejects the promise; there is nothing to report.
+              try { await navigator.share({ title: catalog.site.title, url }); } catch { /* dismissed */ }
+              return;
+            }
+            try { await navigator.clipboard.writeText(url); setShareStatus('Link copied'); }
             catch { setShareStatus('Copy from address bar'); }
             window.setTimeout(() => setShareStatus('Copy link'), 3000);
-          }}><Link2 className="size-3.5 text-ink-3" aria-hidden="true" /><span aria-live="polite" className={shareStatus === 'Copy link' ? 'hidden sm:inline' : ''}>{shareStatus}</span></button>
+          }}>{screen.share ? <><Share className="size-3.5 text-ink-3" aria-hidden="true" /><span>Share</span></>
+            : <><Link2 className="size-3.5 text-ink-3" aria-hidden="true" /><span aria-live="polite" className={shareStatus === 'Copy link' ? 'hidden sm:inline' : ''}>{shareStatus}</span></>}</button>
         </div>
       </header>
 
       {/* Phones show the tissue first with a one-line summary; tablets get two columns and wide screens three. */}
-      <div className="grid flex-1 grid-cols-1 [grid-template-areas:'summary'_'view'_'data'_'color'_'side'] md:grid-cols-[272px_minmax(0,1fr)] md:[grid-template-areas:'data_view'_'color_side'] xl:min-h-0 xl:grid-cols-[264px_minmax(520px,1fr)_288px] xl:grid-rows-[auto_minmax(0,1fr)] xl:[grid-template-areas:'data_view_side'_'color_view_side']">
+      <div className="grid flex-1 grid-cols-1 [grid-template-areas:'summary'_'view'_'data'_'color'_'side'] md:grid-cols-[272px_minmax(0,1fr)] md:[grid-template-areas:'data_view'_'color_side'] xl:min-h-0 xl:grid-cols-[264px_minmax(520px,1fr)_288px] xl:grid-rows-[minmax(0,1fr)] xl:[grid-template-areas:'rail_view_side']">
         <div className="flex items-center gap-3 border-b border-rule bg-panel px-4 py-2 [grid-area:summary] md:hidden">
           <p className="min-w-0 flex-1 truncate text-[13px] text-ink-2">{viewLabel}{displayMode === 'gene' && <> · <span className="gene font-medium text-ink">{selectedGene}</span></>}</p>
-          <a href="#controls" className="shrink-0 py-2 text-[13px] font-medium text-plum underline underline-offset-2">Change</a>
+          <a href="#controls" className="inline-flex h-11 shrink-0 items-center text-[13px] font-medium text-plum underline underline-offset-2">Change</a>
         </div>
 
-        <section id="controls" aria-label="Dataset and gene" className="grid scroll-mt-2 grid-cols-1 content-start gap-3 border-b border-rule bg-panel px-4 py-3.5 [grid-area:data] sm:grid-cols-2 md:grid-cols-1 md:border-r">
+        {/* On wide screens both control sections share one scrolling rail; below that they are separate grid cells. */}
+        <div className="contents xl:flex xl:min-h-0 xl:flex-col xl:overflow-y-auto xl:border-r xl:border-rule xl:bg-panel xl:[grid-area:rail]">
+        <section id="controls" aria-label="Dataset and gene" className="grid scroll-mt-2 grid-cols-1 content-start gap-3 border-b border-rule bg-panel px-4 py-3.5 [grid-area:data] sm:grid-cols-2 md:grid-cols-1 md:border-r xl:border-r-0">
           <Field label="Dataset" htmlFor="dataset-family">
             <NativeSelect id="dataset-family" className="w-full bg-white" value={selectedGroup.family} onChange={(event) => { selectFamily(event.target.value); revealTissue(); }}>
               {datasetFamilies.map((family) => <option key={family} value={family}>{family}</option>)}
@@ -915,7 +961,7 @@ export default function Home() {
             <div className="clear-left grid grid-cols-2 gap-0.5 rounded-lg bg-ground p-0.5">
               {(['identity', 'gene'] as const).map((mode) => (
                 <button key={mode} aria-pressed={displayMode === mode} onClick={() => setDisplayMode(mode)}
-                  className={`h-7 rounded-md text-[13px] font-medium transition-colors pointer-coarse:h-10 ${displayMode === mode ? 'bg-white text-plum shadow-[0_1px_2px_rgba(29,26,24,0.12)]' : 'text-ink-2 hover:text-ink'}`}>
+                  className={`h-7 rounded-md text-[13px] font-medium transition-colors pointer-coarse:h-11 ${displayMode === mode ? 'bg-white text-plum shadow-[0_1px_2px_rgba(29,26,24,0.12)]' : 'text-ink-2 hover:text-ink'}`}>
                   {mode === 'gene' ? 'Gene' : 'Identity'}
                 </button>
               ))}
@@ -927,13 +973,13 @@ export default function Home() {
               <label className="control-label" htmlFor="gene-search">Gene</label>
               <span className="text-xs tabular-nums text-ink-3">{formatNumber(data.genes.length)} genes</span>
             </div>
-            <div className="flex h-8 items-center gap-2 rounded-md border border-rule-strong bg-white px-2.5 focus-within:border-plum focus-within:ring-2 focus-within:ring-plum/30 pointer-coarse:h-10">
+            <div className="flex h-8 items-center gap-2 rounded-md border border-rule-strong bg-white px-2.5 focus-within:border-plum focus-within:ring-2 focus-within:ring-plum/30 pointer-coarse:h-11">
               <Search className="size-3.5 shrink-0 text-ink-3" aria-hidden="true" />
               <input id="gene-search" type="search" autoComplete="off" spellCheck={false} enterKeyHint="search" value={search}
                 onChange={(event) => { setSearch(event.target.value); setSearchMiss(''); }}
                 onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); submitSearch(); } }}
                 aria-describedby="gene-search-help"
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-3" placeholder="Gene or protein, e.g. GLUT1" />
+                className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-3 pointer-coarse:text-base" placeholder="Gene or protein, e.g. GLUT1" />
             </div>
             <div id="gene-search-help" className="space-y-1 empty:hidden">
               {geneSearch.alias && <p className="text-xs text-ink-2">{geneSearch.alias.term} is <span className="gene">{geneSearch.alias.gene}</span>{geneSearch.alias.present ? '.' : ', which isn’t in this dataset.'}</p>}
@@ -944,7 +990,7 @@ export default function Home() {
             <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 sm:grid sm:max-h-[9.5rem] sm:grid-cols-4 sm:gap-px sm:overflow-x-visible sm:overflow-y-auto sm:pb-0 md:grid-cols-2 pointer-coarse:md:max-h-[11rem] xl:max-h-[11rem]">
               {visibleGenes.map((gene) => (
                 <button key={gene.gene} aria-pressed={selectedGene === gene.gene} onClick={() => pickGene(gene.gene)}
-                  className={`gene h-7 shrink-0 truncate rounded-md px-2 text-left text-[13px] transition-colors pointer-coarse:h-10 sm:shrink ${selectedGene !== gene.gene ? 'text-ink hover:bg-ground' : displayMode === 'gene' ? 'bg-plum font-medium text-white' : 'font-medium text-plum underline decoration-plum/40 underline-offset-2 hover:bg-ground'}`}>
+                  className={`gene h-7 shrink-0 truncate rounded-md px-2 text-left text-[13px] transition-colors pointer-coarse:h-11 sm:shrink ${selectedGene !== gene.gene ? 'text-ink hover:bg-ground' : displayMode === 'gene' ? 'bg-plum font-medium text-white' : 'font-medium text-plum underline decoration-plum/40 underline-offset-2 hover:bg-ground'}`}>
                   {gene.gene}
                 </button>
               ))}
@@ -954,7 +1000,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section aria-label="Display settings" className="divide-y divide-rule border-b border-rule bg-panel [grid-area:color] empty:hidden md:border-r md:border-b-0 xl:min-h-0 xl:overflow-y-auto">
+        <section aria-label="Display settings" className="divide-y divide-rule border-b border-rule bg-panel [grid-area:color] empty:hidden md:border-r md:border-b-0 xl:border-r-0">
 
           {displayMode === 'gene' && <div className="space-y-3 px-4 py-3.5">
             <fieldset className="m-0 min-w-0 border-0 p-0">
@@ -962,23 +1008,13 @@ export default function Home() {
               <div className="clear-left grid gap-1 sm:grid-cols-2 md:grid-cols-1">
                 {gradientOptions.map((gradient) => (
                   <button key={gradient.id} onClick={() => setGradientId(gradient.id)} aria-pressed={gradientId === gradient.id}
-                    className={`flex h-7 items-center gap-2.5 rounded-md border px-2 text-left text-xs transition-colors pointer-coarse:h-10 ${gradientId === gradient.id ? 'border-plum bg-white text-ink ring-1 ring-plum' : 'border-transparent text-ink-2 hover:bg-ground hover:text-ink'}`}>
+                    className={`flex h-7 items-center gap-2.5 rounded-md border px-2 text-left text-xs transition-colors pointer-coarse:h-11 ${gradientId === gradient.id ? 'border-plum bg-white text-ink ring-1 ring-plum' : 'border-transparent text-ink-2 hover:bg-ground hover:text-ink'}`}>
                     <span className="h-2 w-14 shrink-0 rounded-[2px]" style={{ background: `linear-gradient(90deg, ${gradient.stops.join(', ')})` }} />
                     {gradient.label}
                   </button>
                 ))}
               </div>
             </fieldset>
-            <div className="space-y-1.5">
-              <label className="control-label" htmlFor="expression-max">Expression maximum</label>
-              <input id="expression-max" type="number" min="0.000001" step="any" inputMode="decimal" placeholder={`Automatic (${automaticCeiling ? automaticCeiling.toFixed(2) : 'P95'})`} value={manualMax} onChange={(event) => { setManualMax(event.target.value); setMaxNotice(''); }}
-                className="h-8 w-full rounded-md border border-rule-strong bg-white px-2.5 text-sm tabular-nums outline-none placeholder:text-ink-3 focus:border-plum focus:ring-2 focus:ring-plum/30" />
-              {manualMax && !hasManualMax
-                ? <p className="text-xs text-plum" role="alert">Enter a positive number. Automatic scaling is on.</p>
-                : maxNotice
-                  ? <output className="block text-xs leading-4 text-plum">{maxNotice}</output>
-                  : <p className="text-xs leading-4 text-ink-3">Leave blank for automatic scaling. A manual maximum applies to <span className="gene">{selectedGene}</span> and stays set across samples in {dataFamily}, so they share one scale. Values are {data.dataset.expression.assay}/{data.dataset.expression.layer}.</p>}
-            </div>
           </div>}
 
           {isHd && <div className="space-y-2 px-4 py-3.5">
@@ -986,6 +1022,7 @@ export default function Home() {
             <input id="hd-dot-size" className="atlas-range" aria-label="Cell dot size" aria-valuetext={`${hdDotSize}%`} type="range" min="25" max="100" step="5" value={hdDotSize} onChange={(event) => setHdDotSize(Number(event.target.value))} />
           </div>}
         </section>
+        </div>
 
         <section aria-label="Spatial view" className="flex min-h-[min(72svh,118vw)] flex-col p-2 [grid-area:view] sm:p-3 md:min-h-[70svh] xl:min-h-0">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 pb-2">
@@ -995,11 +1032,11 @@ export default function Home() {
               <OpacitySlider label={observationSingular === 'cell' ? 'Cells' : 'Spots'} value={spotOpacity} onChange={setSpotOpacity} />
             </div>
             <div className="flex items-center rounded-md border border-rule-strong bg-panel">
-              <Button variant="ghost" size="icon-sm" className="pointer-coarse:size-10" aria-label="Zoom out" onClick={zoomOut}><Minus /></Button>
+              <Button variant="ghost" size="icon-sm" className="pointer-coarse:size-11" aria-label="Zoom out" onClick={zoomOut}><Minus /></Button>
               <span className="w-11 text-center text-xs font-medium tabular-nums text-ink-2">{Math.round(camera.scale * 100)}%</span>
-              <Button variant="ghost" size="icon-sm" className="pointer-coarse:size-10" aria-label="Zoom in" onClick={zoomIn}><Plus /></Button>
+              <Button variant="ghost" size="icon-sm" className="pointer-coarse:size-11" aria-label="Zoom in" onClick={zoomIn}><Plus /></Button>
               <span className="h-4 w-px bg-rule" aria-hidden="true" />
-              <Button variant="ghost" size="icon-sm" className="pointer-coarse:size-10" aria-label="Reset view" onClick={resetView}><RotateCcw /></Button>
+              <Button variant="ghost" size="icon-sm" className="pointer-coarse:size-11" aria-label="Reset view" onClick={resetView}><RotateCcw /></Button>
             </div>
           </div>
 
@@ -1022,14 +1059,14 @@ export default function Home() {
                 <span>Unable to load {viewLabel}.</span><Button size="sm" onClick={() => setRetry((value) => value + 1)}>Retry</Button>
               </div> : <output className="flex items-center gap-2 rounded-md border border-rule bg-panel px-3 py-2 text-sm text-ink-2"><ZoneMark className="size-4 animate-pulse" />Loading {viewLabel}…</output>}
             </div>}
-            {imageStatus !== 'loaded' && <output className="absolute left-3 top-3 z-10 rounded-md border border-rule bg-panel px-2.5 py-1.5 text-xs text-ink-2">
+            {fullResImage && imageStatus !== 'loaded' && <output className="absolute left-3 top-3 z-10 rounded-md border border-rule bg-panel px-2.5 py-1.5 text-xs text-ink-2">
               {imageStatus === 'error' ? <><span>Histology unavailable or image dimensions do not match.</span> <button className="underline underline-offset-2" onPointerDown={(event) => event.stopPropagation()} onClick={() => setImageRetry((value) => value + 1)}>Retry image</button></> : 'Loading full-resolution histology…'}
             </output>}
             <div ref={spatialViewport} className="absolute inset-2">
               {useCanvas ? <AtlasPointCanvas key={imageKey} points={drawnSpots} colors={spotColors} viewBox={spatialViewBox}
                 radius={pointRadius} opacity={spotOpacity / 100} selectedId={selectedSpot?.id} interactive={false}
                 label={`Spatial ${displayMode === 'gene' ? 'gene expression' : 'identity'} overlay`} className="size-full"
-                background={{ url: tissueImage, previewUrl: previewImage, width: imageWidth, height: imageHeight, opacity: imageOpacity / 100 }} /> : <svg className="size-full overflow-visible" viewBox={spatialViewBox} aria-hidden="true" shapeRendering="geometricPrecision">
+                background={{ url: fullResImage, previewUrl: previewImage, width: imageWidth, height: imageHeight, opacity: imageOpacity / 100 }} /> : <svg className="size-full overflow-visible" viewBox={spatialViewBox} aria-hidden="true" shapeRendering="geometricPrecision">
                 {spatialPanel}
               </svg>}
             </div>
@@ -1037,7 +1074,7 @@ export default function Home() {
             <details open={legendOpen} onToggle={(event) => setLegendOpen(event.currentTarget.open)}
               className="group absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-md border border-rule bg-panel/95 shadow-[0_2px_8px_rgba(29,26,24,0.08)]">
               <summary onPointerDown={(event) => event.stopPropagation()}
-                className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-[13px] pointer-coarse:min-h-10 [&::-webkit-details-marker]:hidden">
+                className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-[13px] pointer-coarse:min-h-11 [&::-webkit-details-marker]:hidden">
                 {displayMode === 'gene' ? (
                   <><span className="gene font-medium">{selectedGene}</span><span className="h-2 w-12 rounded-[2px]" style={{ background: gradientCss }} aria-hidden="true" />
                     {hasManualMax && <span className="font-mono text-xs tabular-nums text-plum">max {parsedMax}</span>}</>
@@ -1046,28 +1083,56 @@ export default function Home() {
                 )}
                 <ChevronDown className="ml-auto size-3.5 text-ink-3 transition-transform group-open:rotate-180" aria-hidden="true" />
               </summary>
-              <div className="px-3 pb-2.5">
+              {/* Pointer presses on the legend's controls must not start a pan of the tissue underneath. */}
+              {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions */}
+              <div className="px-3 pb-2.5" onPointerDown={(event) => event.stopPropagation()}>
                 {displayMode === 'gene' ? (
                   <>
                     <p className="text-xs text-ink-3">{geneError ? 'Unavailable' : geneLoading || (isHd && !geneValues) ? 'Loading…' : `${data.dataset.expression.assay}/${data.dataset.expression.layer}`}</p>
                     <div className="mt-1.5 h-2 w-52 max-w-full rounded-[2px]" style={{ background: gradientCss }} />
-                    <div className="mt-1 flex justify-between font-mono text-xs tabular-nums text-ink-2"><span>0</span><span>{geneLoading || (isHd && !geneValues) ? '–' : `${colorCeiling.toFixed(2)}${hasManualMax ? '' : ' (P95)'}`}</span></div>
-                    <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-2"><i className="size-2.5 shrink-0 rounded-full border border-rule" style={{ background: notDetectedColor }} aria-hidden="true" />Not detected</p>
+                    {/* The top of the scale is edited here, next to the colors it changes. */}
+                    <div className="mt-1 flex items-center justify-between gap-2 font-mono text-xs tabular-nums text-ink-2">
+                      <span>0</span>
+                      {/* Inputs inherit their font size (globals.css), so the 16px that keeps iOS from zooming on focus is set here. */}
+                      <span className="flex items-center gap-1.5 pointer-coarse:text-base">
+                        <label htmlFor="expression-max" className="font-sans text-xs text-ink-3">Max</label>
+                        <input id="expression-max" type="number" min="0.000001" step="any" inputMode="decimal" value={manualMax}
+                          placeholder={geneLoading || (isHd && !geneValues) ? '–' : automaticCeiling.toFixed(2)}
+                          onChange={(event) => { setManualMax(event.target.value); setMaxNotice(''); }}
+                          className="h-6 w-16 rounded border border-rule-strong bg-white px-1.5 text-right font-mono tabular-nums outline-none [appearance:textfield] placeholder:text-ink-2 focus:border-plum [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:ring-2 focus:ring-plum/30 pointer-coarse:h-11 pointer-coarse:w-20" />
+                        {hasManualMax
+                          ? <button type="button" onClick={() => { setManualMax(''); setMaxNotice(''); }} className="font-sans text-plum underline underline-offset-2 pointer-coarse:py-2.5">Reset</button>
+                          : <span className="text-xs">P95</span>}
+                      </span>
+                    </div>
+                    {manualMax && !hasManualMax && <p className="mt-1 max-w-52 text-xs leading-4 text-plum" role="alert">Enter a positive number. Automatic scaling is on.</p>}
+                    {maxNotice && <output className="mt-1 block max-w-52 text-xs leading-4 text-plum">{maxNotice}</output>}
+                    <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-2"><i className="size-2.5 shrink-0 rounded-full border border-rule" style={{ background: neutralColor }} aria-hidden="true" />Not detected</p>
                     {selectedStats && <p className="mt-1.5 max-w-52 text-xs leading-4 text-ink-2">Detected in {formatNumber(selectedStats.detected)} of {formatNumber(data.spots.length)} {observationPlural} ({(detectedShare * 100).toFixed(detectedShare < 0.1 ? 1 : 0)}%).</p>}
-                    <p className="mt-1 max-w-52 text-xs leading-4 text-ink-3">{hasManualMax ? 'Manual maximum.' : `95th percentile of expressing ${observationPlural}.`} Higher values use the top color and are drawn on top.</p>
-                    {hasManualMax && <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => { setManualMax(''); setMaxNotice(''); }}
-                      className="mt-1.5 rounded-md border border-rule-strong bg-white px-2 py-1 text-xs text-ink hover:border-plum focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plum/30 pointer-coarse:min-h-10">Reset to automatic (P95)</button>}
                   </>
                 ) : (
-                  <ul className="grid gap-1.5" aria-label="Identity legend">
-                    {legendIdentities.map((identity) => (
-                      <li key={identity} className="flex items-center gap-2 text-[13px] leading-4">
-                        <i className="size-2.5 shrink-0 rounded-full" style={{ background: getIdentityColor(identity) }} aria-hidden="true" />
-                        <span className="font-medium">{identity}</span>
-                        {identityNames[identity] && <span className="text-ink-3">{identityNames[identity]}</span>}
-                      </li>
+                  <fieldset className="m-0 grid gap-2 border-0 p-0">
+                    <legend className="sr-only">Identity legend. Choose identities to highlight them.</legend>
+                    {legendGroups.map((group) => (
+                      <div key={group.label || 'all'}>
+                        {group.label && <p className="mb-0.5 text-xs text-ink-3">{group.label}</p>}
+                        <ul className="grid">
+                          {group.identities.map((identity) => {
+                            const faded = shownSet.size > 0 && !shownSet.has(identity);
+                            return <li key={identity}>
+                              <button type="button" aria-pressed={shownSet.has(identity)} onClick={() => toggleIdentity(identity)}
+                                className={`-mx-1 flex w-[calc(100%+0.5rem)] items-center gap-2 rounded px-1 py-[3px] text-left text-[13px] leading-4 transition-colors hover:bg-ground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plum/30 pointer-coarse:min-h-11 ${shownSet.has(identity) ? 'bg-ground' : ''} ${faded ? 'text-ink-3' : ''}`}>
+                                <i className="size-2.5 shrink-0 rounded-full" style={{ background: getIdentityColor(identity), opacity: faded ? 0.35 : 1 }} aria-hidden="true" />
+                                <span className="font-medium">{identity}</span>
+                                {identityNames[identity] && <span className="text-ink-3">{identityNames[identity]}</span>}
+                              </button>
+                            </li>;
+                          })}
+                        </ul>
+                      </div>
                     ))}
-                  </ul>
+                    {shownSet.size > 0 && <button type="button" onClick={() => setShownIdentities([])} className="justify-self-start text-xs text-plum underline underline-offset-2 pointer-coarse:py-3.5">Show all</button>}
+                  </fieldset>
                 )}
               </div>
             </details>
@@ -1075,15 +1140,16 @@ export default function Home() {
               <i className="size-2.5 shrink-0 rounded-full" style={{ background: getIdentityColor(selectedSpot.identity) }} aria-hidden="true" />
               <span className="font-medium">{selectedSpot.identity}</span>
               <span className="truncate text-ink-2"><span className="gene">{selectedGene}</span> {selectedValueText}</span>
-              <a href="#inspector" onPointerDown={(event) => event.stopPropagation()} className="ml-auto shrink-0 px-1 text-plum underline underline-offset-2 pointer-coarse:py-2.5">Details</a>
+              <a href="#linked-view" onPointerDown={(event) => event.stopPropagation()} className="ml-auto shrink-0 px-1 text-plum underline underline-offset-2 pointer-coarse:py-3.5">Details</a>
               <button aria-label="Clear selection" onPointerDown={(event) => event.stopPropagation()} onClick={() => setSelectedSpot(null)}
-                className="grid size-7 shrink-0 place-items-center rounded text-ink-3 hover:bg-ground hover:text-ink pointer-coarse:size-10"><X className="size-4" /></button>
+                className="grid size-7 shrink-0 place-items-center rounded text-ink-3 hover:bg-ground hover:text-ink pointer-coarse:size-11"><X className="size-4" /></button>
             </div>}
             <p className={`pointer-events-none absolute right-3 top-3 rounded-md bg-panel/90 px-2 py-1 text-xs text-ink-2 ${selectedSpot ? 'hidden xl:block' : 'hidden sm:block'}`}>{formatNumber(filteredSpots.length)} {observationPlural}</p>
           </div>
         </section>
 
-        <aside className="divide-y divide-rule border-t border-rule bg-panel [grid-area:side] xl:min-h-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">
+        {/* "Details" on phones lands here, so the UMAP highlight and the inspector show together. */}
+        <aside id="linked-view" className="scroll-mt-2 divide-y divide-rule border-t border-rule bg-panel [grid-area:side] xl:min-h-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">
           <section className="px-4 py-3.5" aria-labelledby="umap-heading">
             <div className="mb-2 flex items-baseline justify-between gap-2"><h2 id="umap-heading" className="text-sm font-semibold">Linked UMAP</h2><span className="text-xs text-ink-3">{data.dataset.embedding_label}</span></div>
             {umapPanel}
@@ -1092,7 +1158,7 @@ export default function Home() {
           <section id="inspector" className="scroll-mt-4 px-4 py-3.5" aria-labelledby="inspector-heading">
             <div className="mb-2 flex items-center justify-between gap-2">
               <h2 id="inspector-heading" className="text-sm font-semibold">Selected {observationSingular}</h2>
-              {selectedSpot && <button onClick={() => setSelectedSpot(null)} className="rounded px-1 text-xs text-ink-2 underline underline-offset-2 hover:text-ink pointer-coarse:py-2.5">Clear</button>}
+              {selectedSpot && <button onClick={() => setSelectedSpot(null)} className="rounded px-1 text-xs text-ink-2 underline underline-offset-2 hover:text-ink pointer-coarse:py-3.5">Clear</button>}
             </div>
             {selectedSpot ? (
               <div className="space-y-3">
@@ -1163,13 +1229,14 @@ function zoomCameraAt(current: { x: number; y: number; scale: number }, cursor: 
 const applicationRole = { role: 'application', tabIndex: 0 } as const;
 
 const zoneOrder = ['OPZ', 'IQZ', 'HCZ'];
+const tumorStateOrder = ['proliferating tumor', 'RG-like', 'hypoxic niche'];
 function zoneRank(identity: string) {
   const index = zoneOrder.indexOf(identity);
   return index < 0 ? zoneOrder.length : index;
 }
 
 function toggleClass(active: boolean) {
-  return `h-7 pointer-coarse:h-10 rounded-md border px-2.5 text-xs font-medium tabular-nums transition-colors ${active ? 'border-plum bg-plum text-white' : 'border-rule-strong bg-white text-ink-2 hover:border-ink-3 hover:text-ink'}`;
+  return `h-7 pointer-coarse:h-11 rounded-md border px-2.5 text-xs font-medium tabular-nums transition-colors ${active ? 'border-plum bg-plum text-white' : 'border-rule-strong bg-white text-ink-2 hover:border-ink-3 hover:text-ink'}`;
 }
 
 // The gGBO zones from rim to core: OPZ, IQZ, HCZ.

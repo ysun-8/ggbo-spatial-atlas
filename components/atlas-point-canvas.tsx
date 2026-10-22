@@ -78,7 +78,7 @@ export function AtlasPointCanvas({ points, colors, viewBox, radius, opacity, sel
     {background && <svg className="pointer-events-none absolute inset-0 size-full" viewBox={viewBox} aria-hidden="true" style={{ opacity: background.opacity }}>
       {/* The small preview shows until the full-resolution image covers it. */}
       {background.previewUrl && <image href={background.previewUrl} width={background.width} height={background.height} />}
-      <image href={background.url} width={background.width} height={background.height} />
+      {background.url && <image href={background.url} width={background.width} height={background.height} />}
     </svg>}
     <canvas ref={canvas} className="pointer-events-none absolute inset-0 size-full" style={{ opacity }} aria-hidden="true" />
     <svg className="pointer-events-none absolute inset-0 size-full" viewBox={viewBox} aria-hidden="true">
